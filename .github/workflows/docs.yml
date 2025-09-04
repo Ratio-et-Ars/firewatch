@@ -1,0 +1,15 @@
+name: Deploy API docs
+on: { push: { branches: [main] } }
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with: { flutter-version: "3.22.x" }
+      - run: flutter pub get
+      - run: dart doc --output doc/api
+      - uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: doc/api
