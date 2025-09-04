@@ -10,9 +10,9 @@ class UserProfile implements JsonModel {
   UserProfile({required this.id, required this.displayName});
 
   factory UserProfile.fromJson(Map<String, dynamic> m) => UserProfile(
-    id: m['id'] as String,
-    displayName: m['displayName'] as String? ?? '',
-  );
+        id: m['id'] as String,
+        displayName: m['displayName'] as String? ?? '',
+      );
 
   @override
   Map<String, dynamic> toJson() => {'displayName': displayName};

@@ -28,16 +28,15 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
     required DocumentReference<Map<String, dynamic>> Function(
       FirebaseFirestore fs,
       String? uid,
-    )
-    docRefBuilder,
+    ) docRefBuilder,
     AuthUidListenable? authUid, // optional auth source
     bool subscribe = true,
-  }) : _fs = firestore,
-       _fromJson = fromJson,
-       _docRefBuilder = docRefBuilder,
-       _authUid = authUid,
-       _subscribe = subscribe,
-       super(null) {
+  })  : _fs = firestore,
+        _fromJson = fromJson,
+        _docRefBuilder = docRefBuilder,
+        _authUid = authUid,
+        _subscribe = subscribe,
+        super(null) {
     _authUid?.addListener(_onAuth);
     _swap(_currentUserUid);
   }
@@ -49,8 +48,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   final DocumentReference<Map<String, dynamic>> Function(
     FirebaseFirestore,
     String?,
-  )
-  _docRefBuilder;
+  ) _docRefBuilder;
   final bool _subscribe;
 
   // Last materialized data we set as [value]; used to squash metadata churn.

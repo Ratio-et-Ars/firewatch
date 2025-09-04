@@ -5,15 +5,14 @@ import 'package:flutter/foundation.dart';
 
 import 'json_model.dart';
 
-typedef ColRefBuilder =
-    CollectionReference<Map<String, dynamic>> Function(
-      FirebaseFirestore fs,
-      String? uid,
-    );
+typedef ColRefBuilder = CollectionReference<Map<String, dynamic>> Function(
+  FirebaseFirestore fs,
+  String? uid,
+);
 
 /// Mutates a base collection query (e.g., add where/order/limit).
-typedef QueryMutator =
-    Query<Map<String, dynamic>> Function(Query<Map<String, dynamic>> base);
+typedef QueryMutator = Query<Map<String, dynamic>> Function(
+    Query<Map<String, dynamic>> base);
 
 typedef Patch = ({String id, Map<String, Object?> data});
 
@@ -33,16 +32,16 @@ class FirestoreCollectionRepository<T extends JsonModel>
     List<Listenable> dependencies = const [], // extra listenables to watch
     bool subscribe = true, // realtime vs one-shot
     int pageSize = 25, // default page size
-  }) : _fs = firestore,
-       _fromJson = fromJson,
-       _colRefBuilder = colRefBuilder,
-       _authUid = authUid,
-       _subscribe = subscribe,
-       _deps = List.unmodifiable(dependencies),
-       _queryNotifier = ValueNotifier<QueryMutator?>(queryBuilder),
-       _limit = ValueNotifier<int>(pageSize),
-       _pageSize = pageSize,
-       super(const []) {
+  })  : _fs = firestore,
+        _fromJson = fromJson,
+        _colRefBuilder = colRefBuilder,
+        _authUid = authUid,
+        _subscribe = subscribe,
+        _deps = List.unmodifiable(dependencies),
+        _queryNotifier = ValueNotifier<QueryMutator?>(queryBuilder),
+        _limit = ValueNotifier<int>(pageSize),
+        _pageSize = pageSize,
+        super(const []) {
     // Wire listeners (auth + deps + query + limit)
     _authUid?.addListener(_triggerRebuild);
     for (final d in _deps) {
@@ -172,9 +171,9 @@ class FirestoreCollectionRepository<T extends JsonModel>
       final q = _queryWith(uid);
       if (_subscribe) {
         _sub = q.snapshots().listen(
-          (snap) => _handleSnap(snap, fromOneShot: false),
-          onError: (_) => isLoading.value = false,
-        );
+              (snap) => _handleSnap(snap, fromOneShot: false),
+              onError: (_) => isLoading.value = false,
+            );
       } else {
         await _fetchOneShot();
       }
