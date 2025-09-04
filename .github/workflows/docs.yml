@@ -6,7 +6,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
-        with: { flutter-version: "3.22.x" }
+        with: { flutter-version: "3.32.x" }
       - run: flutter pub get
       - run: dart doc --output doc/api
       - uses: peaceiris/actions-gh-pages@v3
