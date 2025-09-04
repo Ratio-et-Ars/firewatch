@@ -2,7 +2,7 @@ name: firewatch
 description: >
   Lightweight Firestore repositories for Flutter: single-doc and collection repos
   that react to auth, stream updates, and support live-window pagination.
-version: 0.2.0
+version: 0.1.1
 homepage: https://github.com/Ratio-et-Ars/firewatch
 repository: https://github.com/Ratio-et-Ars/firewatch
 issue_tracker: https://github.com/Ratio-et-Ars/firewatch/issues
@@ -27,7 +27,7 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  fake_cloud_firestore: ^3.0.0
+  fake_cloud_firestore: ^4.0.0
   flutter_lints: ^4.0.0
   test: ^1.25.15
 
