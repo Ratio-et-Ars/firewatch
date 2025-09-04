@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- Formatting issue
+
 ## 0.1.1
 
 - Adds better documentation, examples, and updates licence
