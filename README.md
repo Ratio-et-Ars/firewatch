@@ -76,7 +76,7 @@ friendsRepo.delete(id!);
 
 ## Examples & Tests
 
-See [example/usage.dart](example/usage.dart)
+See [example/usage.dart](example/main.dart)
 
 ## Documentation
 
