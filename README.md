@@ -78,6 +78,10 @@ friendsRepo.delete(id!);
 
 See [example/usage.dart](example/usage.dart)
 
+## Documentation
+
+[![API Docs](https://img.shields.io/badge/docs-api-blue)](https://ratio-et-ars.github.io/firewatch/)
+
 ## License
 
 MIT - See [LICENSE](LICENSE)

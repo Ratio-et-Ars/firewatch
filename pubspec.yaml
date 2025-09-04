@@ -6,6 +6,7 @@ version: 0.1.0
 homepage: https://github.com/Ratio-et-Ars/firewatch
 repository: https://github.com/Ratio-et-Ars/firewatch
 issue_tracker: https://github.com/Ratio-et-Ars/firewatch/issues
+documentation: https://ratio-et-ars.github.io/firewatch/
 topics:
   - firestore
   - repository
