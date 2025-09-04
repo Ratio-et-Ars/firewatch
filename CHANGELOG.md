@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.0
+
+- Adds better documentation, examples, and updates licence
+
 ## 0.1.0
 
 - Initial release: single-doc and collection repositories
