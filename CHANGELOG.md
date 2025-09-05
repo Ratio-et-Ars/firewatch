@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Improves example and README
+
 ## 0.1.2
 
 - Formatting issue
