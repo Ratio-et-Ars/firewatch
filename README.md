@@ -62,7 +62,6 @@ class UserProfileRepository extends FirestoreDocRepository<UserProfile> {
           fromJson: UserProfile.fromJson,
           docRefBuilder: (fs, uid) => fs.doc('users/$uid'),
           authUid: authUid,
-          subscribe: true,
         );
 }
 
