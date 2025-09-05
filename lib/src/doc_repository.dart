@@ -23,15 +23,15 @@ import 'json_model.dart';
 /// ```
 class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   FirestoreDocRepository({
-    required FirebaseFirestore firestore,
     required T Function(Map<String, dynamic>) fromJson,
     required DocumentReference<Map<String, dynamic>> Function(
       FirebaseFirestore fs,
       String? uid,
     ) docRefBuilder,
+    FirebaseFirestore? firestore,
     AuthUidListenable? authUid, // optional auth source
     bool subscribe = true,
-  })  : _fs = firestore,
+  })  : _fs = firestore ?? FirebaseFirestore.instance,
         _fromJson = fromJson,
         _docRefBuilder = docRefBuilder,
         _authUid = authUid,

@@ -12,38 +12,103 @@ Lightweight Firestore repositories for Flutter.
 
 ```yaml
 dependencies:
-  firewatch: ^0.1.0
+  firewatch:
 ```
 
 ## Quick start
 
+Firewatch repositories are built to work seamlessly with [`watch_it`](https://pub.dev/packages/watch_it).
+Here’s the minimal flow: **Model → Repository → UI**.
+
+---
+
+### 1. Define your model
+
+Firestore-backed models must implement `JsonModel` so Firewatch can inject the
+document ID.
+
 ```dart
-import 'package:firewatch/firewatch.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+class UserProfile implements JsonModel {
+  @override
+  final String id;
+  final String name;
 
-final authUid = ValueNotifier<String?>(null); // wire to your auth layer
+  UserProfile({required this.id, required this.name});
 
-final profileRepo = FirestoreDocRepository<UserProfile>(
-  firestore: FirebaseFirestore.instance,
-  fromJson: UserProfile.fromJson,
-  docRefBuilder: (fs, uid) => fs.doc('users/$uid'),
-  authUid: authUid,
-  subscribe: true,
-);
+  factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
+        id: json['id'] as String,
+        name: json['name'] as String? ?? 'Anonymous',
+      );
 
-final friendsRepo = FirestoreCollectionRepository<UserProfile>(
-  firestore: FirebaseFirestore.instance,
-  fromJson: UserProfile.fromJson,
-  colRefBuilder: (fs, uid) => fs.collection('users/$uid/friends'),
-  authUid: authUid,
-  subscribe: true,
-  pageSize: 25,
-);
-
-// Grow the list:
-await friendsRepo.loadMore();
+  @override
+  Map<String, dynamic> toJson() => {'name': name};
+}
 ```
+
+---
+
+### 2. Create your repositories
+
+Repositories bind models to Firestore. Provide `authUid`
+(a `ValueListenable<String?>`) so Firewatch knows which document/collection to
+read.
+
+```dart
+final authUid = ValueNotifier<String?>(null); // wire this to your auth layer
+
+class UserProfileRepository extends FirestoreDocRepository<UserProfile> {
+  UserProfileRepository()
+      : super(
+          fromJson: UserProfile.fromJson,
+          docRefBuilder: (fs, uid) => fs.doc('users/$uid'),
+          authUid: authUid,
+          subscribe: true,
+        );
+}
+
+class FriendsRepository extends FirestoreCollectionRepository<UserProfile> {
+  FriendsRepository()
+      : super(
+          fromJson: UserProfile.fromJson,
+          colRefBuilder: (fs, uid) => fs.collection('users/$uid/friends'),
+          authUid: authUid,
+        );
+}
+```
+
+---
+
+### 3. Consume in the UI with `watch_it`
+
+Because repositories are `ValueNotifier`s, you can watch them directly in your widgets.
+
+```dart
+class ProfileCard extends StatelessWidget {
+  const ProfileCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = watchIt<UserProfileRepository>().value;
+    final friends = watchIt<FriendsRepository>().value;
+
+    if (profile == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Card(
+      child: ListTile(
+        title: Text('User: ${profile.name}'),
+        subtitle: Text('Friends: ${friends.length}'),
+      ),
+    );
+  }
+}
+```
+
+---
+
+👉 For a **full runnable demo** (with auth wiring and fake Firestore), check
+out the [example/](example/) app in this repo.
 
 ## Bring your own Auth
 
@@ -57,7 +122,8 @@ authUid.value = null; // sign out
 
 ## Commands API
 
-Both repos expose [`command_it`](https://pub.dev/packages/command_it) async commands:
+Both repos expose [`command_it`](https://pub.dev/packages/command_it) async
+commands:
 
 ```dart
 profileRepo.write(UserProfile(id: 'abc123', displayName: 'Marty'));
@@ -73,10 +139,6 @@ friendsRepo.delete(id!);
 - `hasInitialized` (collections): first load completed
 - `hasMore` (collections): whether `loadMore()` can grow the window
 - `notifierFor(docId)`: get a pre-soaked `ValueNotifier<T?>` for a specific item
-
-## Examples & Tests
-
-See [example/usage.dart](example/main.dart)
 
 ## Documentation
 

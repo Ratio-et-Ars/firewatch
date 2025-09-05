@@ -1,0 +1,24 @@
+name: firewatch_example
+description: Example app for the firewatch package
+publish_to: "none"
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  firewatch:
+    path: ../
+  watch_it: 
+  get_it: 
+  cloud_firestore:
+  firebase_auth:
+  injectable: 
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

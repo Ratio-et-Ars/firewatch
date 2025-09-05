@@ -53,7 +53,8 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Creates a new [FirestoreCollectionRepository].
   ///
   /// Parameters:
-  /// - [firestore]: The active [FirebaseFirestore] instance.
+  /// - [firestore]: The active [FirebaseFirestore] instance. Defaults to
+  ///   [FirebaseFirestore.instance]
   /// - [fromJson]: Converts a raw Firestore document map into a model [T].
   /// - [colRefBuilder]: Resolves the collection reference, often scoped by user ID.
   /// - [queryBuilder]: (Optional) Initial query mutator to apply filters,
@@ -69,15 +70,15 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// On construction, listeners are attached and the initial query is run
   /// immediately against the resolved collection for the current user.
   FirestoreCollectionRepository({
-    required FirebaseFirestore firestore,
     required T Function(Map<String, dynamic>) fromJson,
     required ColRefBuilder colRefBuilder,
+    FirebaseFirestore? firestore,
     QueryMutator? queryBuilder, // optional initial query
     AuthUidListenable? authUid, // optional auth listenable
     List<Listenable> dependencies = const [], // extra listenables to watch
     bool subscribe = true, // realtime vs one-shot
     int pageSize = 25, // default page size
-  })  : _fs = firestore,
+  })  : _fs = firestore ?? FirebaseFirestore.instance,
         _fromJson = fromJson,
         _colRefBuilder = colRefBuilder,
         _authUid = authUid,
