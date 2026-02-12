@@ -67,6 +67,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// - [subscribe]: If true (default), repository stays in sync with
   ///   live Firestore updates. If false, fetches a one-shot snapshot only.
   /// - [pageSize]: Initial page size for paginated queries (default: 25).
+  /// - [paginate]: If true (default), enables pagination via `loadMore()`.
   ///
   /// On construction, listeners are attached and the initial query is run
   /// immediately against the resolved collection for the current user.
@@ -79,6 +80,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
     List<Listenable> dependencies = const [], // extra listenables to watch
     bool subscribe = true, // realtime vs one-shot
     int pageSize = 25, // default page size
+    bool paginate = true,
   }) : _fs = firestore ?? FirebaseFirestore.instance,
        _fromJson = fromJson,
        _colRefBuilder = colRefBuilder,
@@ -88,7 +90,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
        _queryNotifier = ValueNotifier<QueryMutator?>(queryBuilder),
        _limit = ValueNotifier<int>(pageSize),
        _pageSize = pageSize,
-       _paginate = true,
+       _paginate = paginate,
        super(const []) {
     // Wire listeners (auth + deps + query + limit)
     _authUid?.addListener(_triggerRebuild);
