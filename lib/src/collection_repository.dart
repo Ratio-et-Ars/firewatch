@@ -17,14 +17,15 @@ import 'json_model.dart';
 ///
 /// Used by repositories to dynamically resolve the correct collection path
 /// (e.g. `users/{uid}/entries`).
-typedef ColRefBuilder = CollectionReference<Map<String, dynamic>> Function(
-  FirebaseFirestore fs,
-  String? uid,
-);
+typedef ColRefBuilder =
+    CollectionReference<Map<String, dynamic>> Function(
+      FirebaseFirestore fs,
+      String? uid,
+    );
 
 /// Mutates a base collection query (e.g., add where/order/limit).
-typedef QueryMutator = Query<Map<String, dynamic>> Function(
-    Query<Map<String, dynamic>> base);
+typedef QueryMutator =
+    Query<Map<String, dynamic>> Function(Query<Map<String, dynamic>> base);
 
 /// Represents a partial update to a Firestore document.
 ///
@@ -66,6 +67,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// - [subscribe]: If true (default), repository stays in sync with
   ///   live Firestore updates. If false, fetches a one-shot snapshot only.
   /// - [pageSize]: Initial page size for paginated queries (default: 25).
+  /// - [paginate]: If true (default), enables pagination via `loadMore()`.
   ///
   /// On construction, listeners are attached and the initial query is run
   /// immediately against the resolved collection for the current user.
@@ -78,16 +80,18 @@ class FirestoreCollectionRepository<T extends JsonModel>
     List<Listenable> dependencies = const [], // extra listenables to watch
     bool subscribe = true, // realtime vs one-shot
     int pageSize = 25, // default page size
-  })  : _fs = firestore ?? FirebaseFirestore.instance,
-        _fromJson = fromJson,
-        _colRefBuilder = colRefBuilder,
-        _authUid = authUid,
-        _subscribe = subscribe,
-        _deps = List.unmodifiable(dependencies),
-        _queryNotifier = ValueNotifier<QueryMutator?>(queryBuilder),
-        _limit = ValueNotifier<int>(pageSize),
-        _pageSize = pageSize,
-        super(const []) {
+    bool paginate = true,
+  }) : _fs = firestore ?? FirebaseFirestore.instance,
+       _fromJson = fromJson,
+       _colRefBuilder = colRefBuilder,
+       _authUid = authUid,
+       _subscribe = subscribe,
+       _deps = List.unmodifiable(dependencies),
+       _queryNotifier = ValueNotifier<QueryMutator?>(queryBuilder),
+       _limit = ValueNotifier<int>(pageSize),
+       _pageSize = pageSize,
+       _paginate = paginate,
+       super(const []) {
     // Wire listeners (auth + deps + query + limit)
     _authUid?.addListener(_triggerRebuild);
     for (final d in _deps) {
@@ -111,6 +115,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
 
   // pagination state
   final int _pageSize;
+  final bool _paginate;
   final ValueNotifier<int> _limit;
   final ValueNotifier<bool> hasMore = ValueNotifier<bool>(true);
   bool _resizing = false; // avoid duplicate resubscribes on rapid changes
@@ -135,7 +140,6 @@ class FirestoreCollectionRepository<T extends JsonModel>
 
   /// Swap the active query; pass `null` to clear and use base collection.
   void setQuery(QueryMutator? qb) {
-    if (identical(_queryNotifier.value, qb)) return;
     _queryNotifier.value = qb; // listener triggers _swap
   }
 
@@ -229,37 +233,64 @@ class FirestoreCollectionRepository<T extends JsonModel>
     final base = _colWith(uid);
     final qb = _queryNotifier.value;
     final q = qb == null ? base : qb(base);
-    return q.limit(_limit.value); // apply live window limit
+    return _paginate ? q.limit(_limit.value) : q; // apply live window limit
   }
 
   Future<void> _resizeWindow() async {
     if (_resizing) return;
     final uid = _currentUserUid;
     if (uid == null) return;
+
     _resizing = true;
+    final epoch = ++_epoch;
+
     isLoading.value = true;
 
-    await _sub?.cancel();
+    _cancelSubAsync();
+
     try {
       final q = _queryWith(uid);
+
       if (_subscribe) {
         _sub = q.snapshots().listen(
-              (snap) => _handleSnap(snap, fromOneShot: false),
-              onError: (_) => isLoading.value = false,
-            );
+          (snap) {
+            if (epoch != _epoch) return;
+            _handleSnap(snap, fromOneShot: false);
+          },
+          onError: (_) {
+            if (epoch != _epoch) return;
+            isLoading.value = false;
+          },
+        );
       } else {
-        await _fetchOneShot();
+        await _fetchOneShotEpoch(epoch);
       }
     } finally {
-      _resizing = false;
-      // isLoading flips false in _handleSnap when data arrives.
+      if (epoch == _epoch) _resizing = false;
+    }
+  }
+
+  // Add this field near the other state:
+  int _epoch = 0;
+
+  // Utility: cancel without ever blocking a swap
+  void _cancelSubAsync() {
+    final old = _sub;
+    _sub = null;
+    if (old != null) {
+      // Fire-and-forget; do not await on the hot path.
+      unawaited(old.cancel());
     }
   }
 
   Future<void> _swap(String? uid, {bool clearExisting = true}) async {
+    final epoch = ++_epoch;
+
     isLoading.value = true;
     hasInitialized.value = false;
-    await _sub?.cancel();
+
+    _cancelSubAsync();
+
     if (clearExisting) value = const [];
 
     if (uid == null) {
@@ -270,31 +301,43 @@ class FirestoreCollectionRepository<T extends JsonModel>
     }
 
     hasMore.value = true;
-    final q = _queryWith(uid);
+
+    final q = _queryWith(uid); // <-- queryBuilder should run here
+
     if (_subscribe) {
       _sub = q.snapshots().listen(
-        _handleSnap,
+        (snap) {
+          if (epoch != _epoch) return;
+          _handleSnap(snap, fromOneShot: false);
+        },
         onError: (_) {
+          if (epoch != _epoch) return;
           hasInitialized.value = true;
           isLoading.value = false;
         },
       );
     } else {
-      await _fetchOneShot();
+      await _fetchOneShotEpoch(epoch);
     }
   }
 
-  Future<void> _fetchOneShot() async {
+  Future<void> _fetchOneShotEpoch(int epoch) async {
     try {
       final uid = _currentUserUid;
       if (uid == null) {
+        if (epoch != _epoch) return;
         hasInitialized.value = true;
         return;
       }
+
       final snap = await _queryWith(uid).get();
+      if (epoch != _epoch) return;
       _handleSnap(snap, fromOneShot: true);
     } finally {
-      isLoading.value = false;
+      if (epoch == _epoch) {
+        isLoading.value = false;
+        hasInitialized.value = true;
+      }
     }
   }
 
@@ -321,6 +364,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   @override
   void dispose() {
     _limit.removeListener(_resizeWindow);
+    _cancelSubAsync();
     _sub?.cancel();
     _authUid?.removeListener(_triggerRebuild);
     _queryNotifier.removeListener(_triggerRebuild);
