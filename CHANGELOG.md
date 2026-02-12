@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4
+
+- Adds `paginate` option to `FirestoreCollectRepository` to enable pagination 
+of collection queries
+
 ## 0.1.3
 
 - Improves example and README
