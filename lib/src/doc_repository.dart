@@ -60,7 +60,10 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   // Epoch counter to prevent stale async operations from updating state.
   int _epoch = 0;
 
-  // Expose loading state so UIs can show spinners/progress bars.
+  /// Whether the repository is currently fetching data from Firestore.
+  ///
+  /// `true` during initial load, auth transitions, and pending writes.
+  /// Use this to drive spinners or progress indicators in the UI.
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(true);
 
   String? get _currentUserUid => _authUid?.value;
@@ -157,19 +160,35 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   }
 
   // ── public write API (require signed-in user) ─────────────────────────────
+
+  /// Creates or merges a document with the full model.
+  ///
+  /// Uses `set` with `merge: true`, so existing fields not present in
+  /// [model] are preserved. Throws [StateError] if not authenticated.
   late final write = Command.createAsyncNoResult<T>(
     (T model) =>
         _docOrThrow().set(model.toJson(), SetOptions(merge: true)),
   );
 
+  /// Replaces all fields on the existing document with [model].
+  ///
+  /// Unlike [write], this fails if the document does not already exist.
+  /// Throws [StateError] if not authenticated.
   late final update = Command.createAsyncNoResult<T>(
     (T model) => _docOrThrow().update(model.toJson()),
   );
 
+  /// Partially updates specific fields on the document.
+  ///
+  /// Only the keys present in the map are modified; all other fields
+  /// remain unchanged. Throws [StateError] if not authenticated.
   late final patch = Command.createAsyncNoResult<Map<String, dynamic>>(
     (map) => _docOrThrow().update(map),
   );
 
+  /// Deletes the document.
+  ///
+  /// Throws [StateError] if not authenticated.
   late final delete = Command.createAsyncNoParamNoResult(
     () => _docOrThrow().delete(),
   );

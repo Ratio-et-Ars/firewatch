@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.0
+
+- Stable release — no API changes, just documentation polish
+- Added doc comments to all public members across both repository types
+
 ## 0.3.0
 
 ### Improved

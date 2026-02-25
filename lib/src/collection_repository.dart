@@ -117,6 +117,10 @@ class FirestoreCollectionRepository<T extends JsonModel>
   final int _pageSize;
   final bool _paginate;
   final ValueNotifier<int> _limit;
+  /// Whether there are more documents beyond the current page.
+  ///
+  /// `true` when the last snapshot returned at least [pageSize] documents,
+  /// indicating another page may be available via [loadMore].
   final ValueNotifier<bool> hasMore = ValueNotifier<bool>(true);
   bool _resizing = false; // avoid duplicate resubscribes on rapid changes
 
@@ -129,12 +133,32 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// unchanged documents on each snapshot event.
   final Map<String, T> _modelCache = {};
 
-  /// Loading flags to help drive UI states.
+  /// Whether the repository is currently fetching data from Firestore.
+  ///
+  /// `true` during initial load, auth transitions, pagination, and refreshes.
+  /// Use this to drive spinners or progress indicators in the UI.
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(true);
+
+  /// Whether the repository has completed its first query.
+  ///
+  /// `false` until the first snapshot (or cache prime) arrives. Once `true`,
+  /// it remains `true` until the next [refresh] or auth change resets it.
   final ValueNotifier<bool> hasInitialized = ValueNotifier<bool>(false);
 
+  /// `true` when the first query has not yet completed.
+  ///
+  /// Useful for showing a full-screen skeleton or placeholder on first load.
   bool get isInitializing => !hasInitialized.value && isLoading.value;
+
+  /// `true` when a subsequent fetch is in progress after initial load.
+  ///
+  /// Useful for showing a subtle refresh indicator over existing data.
   bool get isRefreshing => hasInitialized.value && isLoading.value;
+
+  /// `true` when initialization is complete, loading is done, and the
+  /// collection is empty.
+  ///
+  /// Useful for showing an empty-state illustration or message.
   bool get showEmpty =>
       hasInitialized.value && !isLoading.value && value.isEmpty;
 
