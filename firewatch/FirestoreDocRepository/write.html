@@ -55,7 +55,7 @@
     
       <section class="multi-line-signature">
         
-        <a href="https://pub.dev/documentation/command_it/8.0.0/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter">T</span>, <span class="type-parameter">void</span>&gt;</span>
+        <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter">T</span>, <span class="type-parameter">void</span>&gt;</span>
         <span class="name ">write</span>
         <div class="features"><span class="feature">late</span><span class="feature">final</span></div>
 
@@ -65,10 +65,9 @@
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final write = Command.createAsync(
-  (T model, {bool merge = true}) async =&gt;
-      (await _docOrThrow().set(model.toJson(), SetOptions(merge: merge))),
-  initialValue: null,
+  <pre class="language-dart"><code class="language-dart">late final write = Command.createAsyncNoResult&lt;T&gt;(
+  (T model) =&gt;
+      _docOrThrow().set(model.toJson(), SetOptions(merge: true)),
 );</code></pre>
 </section>
 
@@ -98,7 +97,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      0.1.0
+      0.3.0
   </span>
   
 </footer>

@@ -82,8 +82,12 @@ listeners or not immediately before disposal.</p>
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">@override
 void dispose() {
-  _sub?.cancel();
+  _cancelSubAsync();
   _authUid?.removeListener(_onAuth);
+  write.dispose();
+  update.dispose();
+  patch.dispose();
+  delete.dispose();
   isLoading.dispose();
   super.dispose();
 }</code></pre>
@@ -114,7 +118,7 @@ void dispose() {
 <footer>
   <span class="no-break">
     firewatch
-      0.1.0
+      0.3.0
   </span>
   
 </footer>

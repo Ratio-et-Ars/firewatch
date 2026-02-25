@@ -55,12 +55,18 @@
     
       <section class="multi-line-signature">
         
-        <a href="https://pub.dev/documentation/command_it/8.0.0/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../firewatch/Patch.html">Patch</a></span>, <span class="type-parameter">void</span>&gt;</span>
+        <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../firewatch/Patch.html">Patch</a></span>, <span class="type-parameter">void</span>&gt;</span>
         <span class="name ">patch</span>
         <div class="features"><span class="feature">late</span><span class="feature">final</span></div>
 
       </section>
       
+<section class="desc markdown">
+  <p>Partially updates fields on an existing document.</p>
+<p>Input: A <a href="../../firewatch/Patch.html">Patch</a> containing a <code>doc.id</code> and <code>data</code> map.
+Behavior: Only the provided fields are updated; other fields are untouched.
+Example: <code>patch((id: 'u1', data: {'name': 'Bob'}));</code></p>
+</section>
 
       
 <section class="summary source-code" id="source">
@@ -96,7 +102,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      0.1.0
+      0.3.0
   </span>
   
 </footer>

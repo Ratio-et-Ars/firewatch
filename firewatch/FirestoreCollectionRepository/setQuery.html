@@ -71,7 +71,6 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">void setQuery(QueryMutator? qb) {
-  if (identical(_queryNotifier.value, qb)) return;
   _queryNotifier.value = qb; &#47;&#47; listener triggers _swap
 }</code></pre>
 </section>
@@ -101,7 +100,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      0.1.0
+      0.3.0
   </span>
   
 </footer>

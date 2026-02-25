@@ -54,35 +54,83 @@
 </ul>
 <h2 id="install">Install</h2>
 <pre class="language-yaml"><code class="language-yaml">dependencies:
-  firewatch: ^0.1.0
+  firewatch:
 </code></pre>
 <h2 id="quick-start">Quick start</h2>
-<pre class="language-dart"><code class="language-dart">import 'package:firewatch/firewatch.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
+<p>Firewatch repositories are built to work seamlessly with <a href="https://pub.dev/packages/watch_it"><code>watch_it</code></a>.
+Here’s the minimal flow: <strong>Model → Repository → UI</strong>.</p>
+<hr>
+<h3 id="1-define-your-model">1. Define your model</h3>
+<p>Firestore-backed models must implement <code>JsonModel</code> so Firewatch can inject the
+document ID.</p>
+<pre class="language-dart"><code class="language-dart">class UserProfile implements JsonModel {
+  @override
+  final String id;
+  final String name;
 
-final authUid = ValueNotifier&lt;String?&gt;(null); // wire to your auth layer
+  UserProfile({required this.id, required this.name});
 
-final profileRepo = FirestoreDocRepository&lt;UserProfile&gt;(
-  firestore: FirebaseFirestore.instance,
-  fromJson: UserProfile.fromJson,
-  docRefBuilder: (fs, uid) =&gt; fs.doc('users/$uid'),
-  authUid: authUid,
-  subscribe: true,
-);
+  factory UserProfile.fromJson(Map&lt;String, dynamic&gt; json) =&gt; UserProfile(
+        id: json['id'] as String,
+        name: json['name'] as String? ?? 'Anonymous',
+      );
 
-final friendsRepo = FirestoreCollectionRepository&lt;UserProfile&gt;(
-  firestore: FirebaseFirestore.instance,
-  fromJson: UserProfile.fromJson,
-  colRefBuilder: (fs, uid) =&gt; fs.collection('users/$uid/friends'),
-  authUid: authUid,
-  subscribe: true,
-  pageSize: 25,
-);
-
-// Grow the list:
-await friendsRepo.loadMore();
+  @override
+  Map&lt;String, dynamic&gt; toJson() =&gt; {'name': name};
+}
 </code></pre>
+<hr>
+<h3 id="2-create-your-repositories">2. Create your repositories</h3>
+<p>Repositories bind models to Firestore. Provide <code>authUid</code>
+(a <code>ValueListenable&lt;String?&gt;</code>) so Firewatch knows which document/collection to
+read.</p>
+<pre class="language-dart"><code class="language-dart">final authUid = ValueNotifier&lt;String?&gt;(null); // wire this to your auth layer
+
+class UserProfileRepository extends FirestoreDocRepository&lt;UserProfile&gt; {
+  UserProfileRepository()
+      : super(
+          fromJson: UserProfile.fromJson,
+          docRefBuilder: (fs, uid) =&gt; fs.doc('users/$uid'),
+          authUid: authUid,
+        );
+}
+
+class FriendsRepository extends FirestoreCollectionRepository&lt;UserProfile&gt; {
+  FriendsRepository()
+      : super(
+          fromJson: UserProfile.fromJson,
+          colRefBuilder: (fs, uid) =&gt; fs.collection('users/$uid/friends'),
+          authUid: authUid,
+        );
+}
+</code></pre>
+<hr>
+<h3 id="3-consume-in-the-ui-with-watch_it">3. Consume in the UI with <code>watch_it</code></h3>
+<p>Because repositories are <code>ValueNotifier</code>s, you can watch them directly in your widgets.</p>
+<pre class="language-dart"><code class="language-dart">class ProfileCard extends StatelessWidget {
+  const ProfileCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = watchIt&lt;UserProfileRepository&gt;().value;
+    final friends = watchIt&lt;FriendsRepository&gt;().value;
+
+    if (profile == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Card(
+      child: ListTile(
+        title: Text('User: ${profile.name}'),
+        subtitle: Text('Friends: ${friends.length}'),
+      ),
+    );
+  }
+}
+</code></pre>
+<hr>
+<p>👉 For a <strong>full runnable demo</strong> (with auth wiring and fake Firestore), check
+out the <a href="example/">example/</a> app in this repo.</p>
 <h2 id="bring-your-own-auth">Bring your own Auth</h2>
 <p>Firewatch accepts any ValueListenable&lt;String?&gt; that yields the current user UID.
 Update it on sign-in/out and the repos will re-attach.</p>
@@ -90,7 +138,8 @@ Update it on sign-in/out and the repos will re-attach.</p>
 authUid.value = null; // sign out
 </code></pre>
 <h2 id="commands-api">Commands API</h2>
-<p>Both repos expose <a href="https://pub.dev/packages/command_it"><code>command_it</code></a> async commands:</p>
+<p>Both repos expose <a href="https://pub.dev/packages/command_it"><code>command_it</code></a> async
+commands:</p>
 <pre class="language-dart"><code class="language-dart">profileRepo.write(UserProfile(id: 'abc123', displayName: 'Marty'));
 profileRepo.patch({'bio': 'Hello'});
 
@@ -104,8 +153,8 @@ friendsRepo.delete(id!);
 <li><code>hasMore</code> (collections): whether <code>loadMore()</code> can grow the window</li>
 <li><code>notifierFor(docId)</code>: get a pre-soaked <code>ValueNotifier&lt;T?&gt;</code> for a specific item</li>
 </ul>
-<h2 id="examples--tests">Examples &amp; Tests</h2>
-<p>See <a href="example/usage.dart">example/usage.dart</a></p>
+<h2 id="documentation">Documentation</h2>
+<p><a href="https://ratio-et-ars.github.io/firewatch/"><img src="https://img.shields.io/badge/docs-api-blue" alt="API Docs"></a></p>
 <h2 id="license">License</h2>
 <p>MIT - See <a href="LICENSE">LICENSE</a></p>
 </section>
@@ -118,7 +167,7 @@ friendsRepo.delete(id!);
   <span class="name"><a href="firewatch/">firewatch</a></span> 
 
 </dt>
-<dd>
+<dd>Firewatch – opinionated Firestore repositories for responsive UIs.
 </dd>
 
         </dl>
@@ -148,7 +197,7 @@ friendsRepo.delete(id!);
 <footer>
   <span class="no-break">
     firewatch
-      0.1.0
+      0.3.0
   </span>
   
 </footer>

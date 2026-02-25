@@ -55,12 +55,19 @@
     
       <section class="multi-line-signature">
         
-        <a href="https://pub.dev/documentation/command_it/8.0.0/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter">T</span>, <span class="type-parameter">void</span>&gt;</span>
+        <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter">T</span>, <span class="type-parameter">void</span>&gt;</span>
         <span class="name ">set</span>
         <div class="features"><span class="feature">late</span><span class="feature">final</span></div>
 
       </section>
       
+<section class="desc markdown">
+  <p>Creates or replaces a document in the collection.</p>
+<p>Input: A model <code>T</code> with a valid <code>id</code>.
+Behavior: Writes <code>model.toJson()</code> at the document path,
+merging with existing data if present.
+Example: <code>set(User(id: 'u1', name: 'Alice'));</code></p>
+</section>
 
       
 <section class="summary source-code" id="source">
@@ -98,7 +105,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      0.1.0
+      0.3.0
   </span>
   
 </footer>

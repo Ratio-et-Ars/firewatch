@@ -54,33 +54,57 @@
 
     <section class="multi-line-signature">
       
-      <span class="name ">FirestoreCollectionRepository&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span>(<wbr>{<ol class="parameter-list"> <li><span class="parameter" id="-param-firestore"><span>required</span> <span class="type-annotation"><a href="https://pub.dev/documentation/cloud_firestore/5.6.12/cloud_firestore/FirebaseFirestore-class.html">FirebaseFirestore</a></span> <span class="parameter-name">firestore</span>, </span></li>
-<li><span class="parameter" id="-param-fromJson"><span>required</span> <span class="type-annotation">T</span> <span class="parameter-name">fromJson</span>(<ol class="parameter-list single-line"> <li><span class="parameter" id="param-"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span></span></li>
+      <span class="name ">FirestoreCollectionRepository&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span>(<wbr>{<ol class="parameter-list"> <li><span class="parameter" id="-param-fromJson"><span>required</span> <span class="type-annotation">T</span> <span class="parameter-name">fromJson</span>(<ol class="parameter-list single-line"> <li><span class="parameter" id="param-"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span></span></li>
 </ol>), </span></li>
 <li><span class="parameter" id="-param-colRefBuilder"><span>required</span> <span class="type-annotation"><a href="../../firewatch/ColRefBuilder.html">ColRefBuilder</a></span> <span class="parameter-name">colRefBuilder</span>, </span></li>
+<li><span class="parameter" id="-param-firestore"><span class="type-annotation"><a href="https://pub.dev/documentation/cloud_firestore/6.1.2/cloud_firestore/FirebaseFirestore-class.html">FirebaseFirestore</a>?</span> <span class="parameter-name">firestore</span>, </span></li>
 <li><span class="parameter" id="-param-queryBuilder"><span class="type-annotation"><a href="../../firewatch/QueryMutator.html">QueryMutator</a>?</span> <span class="parameter-name">queryBuilder</span>, </span></li>
 <li><span class="parameter" id="-param-authUid"><span class="type-annotation"><a href="../../firewatch/AuthUidListenable.html">AuthUidListenable</a>?</span> <span class="parameter-name">authUid</span>, </span></li>
 <li><span class="parameter" id="-param-dependencies"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/foundation/Listenable-class.html">Listenable</a></span>&gt;</span></span> <span class="parameter-name">dependencies</span> = <span class="default-value">const []</span>, </span></li>
 <li><span class="parameter" id="-param-subscribe"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">subscribe</span> = <span class="default-value">true</span>, </span></li>
 <li><span class="parameter" id="-param-pageSize"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">pageSize</span> = <span class="default-value">25</span>, </span></li>
+<li><span class="parameter" id="-param-paginate"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">paginate</span> = <span class="default-value">true</span>, </span></li>
 </ol>})
     </section>
     
+<section class="desc markdown">
+  <p>Creates a new <a href="../../firewatch/FirestoreCollectionRepository-class.html">FirestoreCollectionRepository</a>.</p>
+<p>Parameters:</p>
+<ul>
+<li><code>firestore</code>: The active <a href="https://pub.dev/documentation/cloud_firestore/6.1.2/cloud_firestore/FirebaseFirestore-class.html">FirebaseFirestore</a> instance. Defaults to
+<a href="https://pub.dev/documentation/cloud_firestore/6.1.2/cloud_firestore/FirebaseFirestore/instance.html">FirebaseFirestore.instance</a></li>
+<li><code>fromJson</code>: Converts a raw Firestore document map into a model <code>T</code>.</li>
+<li><code>colRefBuilder</code>: Resolves the collection reference, often scoped by user ID.</li>
+<li><code>queryBuilder</code>: (Optional) Initial query mutator to apply filters,
+ordering, or limits to the collection.</li>
+<li><code>authUid</code>: (Optional) A listenable source of the current user ID;
+repository will rebuild automatically when this changes.</li>
+<li><code>dependencies</code>: (Optional) Extra <a href="https://api.flutter.dev/flutter/foundation/Listenable-class.html">Listenable</a>s to watch; any change
+triggers a query refresh.</li>
+<li><code>subscribe</code>: If true (default), repository stays in sync with
+live Firestore updates. If false, fetches a one-shot snapshot only.</li>
+<li><code>pageSize</code>: Initial page size for paginated queries (default: 25).</li>
+<li><code>paginate</code>: If true (default), enables pagination via <code>loadMore()</code>.</li>
+</ul>
+<p>On construction, listeners are attached and the initial query is run
+immediately against the resolved collection for the current user.</p>
+</section>
 
 
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">FirestoreCollectionRepository({
-  required FirebaseFirestore firestore,
   required T Function(Map&lt;String, dynamic&gt;) fromJson,
   required ColRefBuilder colRefBuilder,
+  FirebaseFirestore? firestore,
   QueryMutator? queryBuilder, &#47;&#47; optional initial query
   AuthUidListenable? authUid, &#47;&#47; optional auth listenable
   List&lt;Listenable&gt; dependencies = const [], &#47;&#47; extra listenables to watch
   bool subscribe = true, &#47;&#47; realtime vs one-shot
   int pageSize = 25, &#47;&#47; default page size
-}) : _fs = firestore,
+  bool paginate = true,
+}) : _fs = firestore ?? FirebaseFirestore.instance,
      _fromJson = fromJson,
      _colRefBuilder = colRefBuilder,
      _authUid = authUid,
@@ -89,6 +113,7 @@
      _queryNotifier = ValueNotifier&lt;QueryMutator?&gt;(queryBuilder),
      _limit = ValueNotifier&lt;int&gt;(pageSize),
      _pageSize = pageSize,
+     _paginate = paginate,
      super(const []) {
   &#47;&#47; Wire listeners (auth + deps + query + limit)
   _authUid?.addListener(_triggerRebuild);
@@ -127,7 +152,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      0.1.0
+      0.3.0
   </span>
   
 </footer>
