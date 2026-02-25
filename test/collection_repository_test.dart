@@ -271,4 +271,243 @@ void main() {
 
     repo.dispose();
   });
+
+  test('collection repo one-shot mode (subscribe: false)', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    for (var i = 0; i < 3; i++) {
+      await col.add({'n': i});
+    }
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: false,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 3);
+    expect(repo.isLoading.value, isFalse);
+    expect(repo.hasInitialized.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('collection repo one-shot with pagination and loadMore', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    for (var i = 0; i < 5; i++) {
+      await col.add({'n': i});
+    }
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: false,
+      pageSize: 3,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 3);
+    expect(repo.hasMore.value, isTrue);
+
+    // loadMore triggers _resizeWindow in one-shot mode
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 5);
+    expect(repo.hasMore.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('collection repo set and update commands work', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Use set to create a doc with a known ID
+    await repo.set.runAsync(Item(id: 'item1', n: 10));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 1);
+    expect(repo.value.first.n, 10);
+
+    // Use update to change it
+    await repo.update.runAsync(Item(id: 'item1', n: 20));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.first.n, 20);
+
+    repo.dispose();
+  });
+
+  test('collection repo isInitializing, isRefreshing, showEmpty getters',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    // Before initialization completes
+    expect(repo.isInitializing, isTrue);
+    expect(repo.isRefreshing, isFalse);
+    expect(repo.showEmpty, isFalse);
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // After initialization with empty collection
+    expect(repo.isInitializing, isFalse);
+    expect(repo.isRefreshing, isFalse);
+    expect(repo.showEmpty, isTrue);
+
+    // Add a doc so it's no longer empty
+    await fs.collection('users/u1/items').add({'n': 1});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.showEmpty, isFalse);
+
+    repo.dispose();
+  });
+
+  test('collection repo refresh re-fetches data', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    await col.add({'n': 1});
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 1);
+
+    // Add another doc and refresh
+    await col.add({'n': 2});
+    await repo.refresh();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 2);
+
+    repo.dispose();
+  });
+
+  test('collection repo resetPages resets to first page', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    for (var i = 0; i < 5; i++) {
+      await col.add({'n': i});
+    }
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 2,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+
+    // Load more pages
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 4);
+
+    // Reset pages
+    await repo.resetPages();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+    expect(repo.hasMore.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('collection repo paginate: false returns all results', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    for (var i = 0; i < 10; i++) {
+      await col.add({'n': i});
+    }
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 3,
+      paginate: false,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // All 10 docs returned despite pageSize: 3
+    expect(repo.value.length, 10);
+
+    repo.dispose();
+  });
+
+  test('collection repo one-shot signed out returns empty', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: false,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value, isEmpty);
+    expect(repo.hasInitialized.value, isTrue);
+    expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
 }
