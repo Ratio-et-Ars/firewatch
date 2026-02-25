@@ -36,7 +36,7 @@ jobs:
         run: |
           gh release create "v${{ steps.version.outputs.version }}" \
             --title "v${{ steps.version.outputs.version }}" \
-            --notes-file release_notes.md
+            --notes-file release_notes.md || echo "Release already exists, skipping."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
