@@ -125,6 +125,10 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Per-item notifiers stay in sync with the current list.
   final Map<String, ValueNotifier<T?>> _itemNotifiers = {};
 
+  /// Model cache for incremental snapshot processing; avoids re-parsing
+  /// unchanged documents on each snapshot event.
+  final Map<String, T> _modelCache = {};
+
   /// Loading flags to help drive UI states.
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(true);
   final ValueNotifier<bool> hasInitialized = ValueNotifier<bool>(false);
@@ -250,6 +254,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
     isLoading.value = true;
 
     _cancelSubAsync();
+    _modelCache.clear();
 
     try {
       final q = _queryWith(uid);
@@ -293,6 +298,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
     hasInitialized.value = false;
 
     _cancelSubAsync();
+    _modelCache.clear();
 
     if (clearExisting) value = const [];
 
@@ -305,7 +311,19 @@ class FirestoreCollectionRepository<T extends JsonModel>
 
     hasMore.value = true;
 
-    final q = _queryWith(uid); // <-- queryBuilder should run here
+    final q = _queryWith(uid);
+
+    // Prime from CACHE for instant UI, if available.
+    try {
+      final cacheSnap = await q.get(const GetOptions(source: Source.cache));
+      if (epoch != _epoch) return; // stale
+      if (cacheSnap.docs.isNotEmpty) {
+        _handleSnap(cacheSnap, fromOneShot: false);
+      }
+    } catch (_) {
+      if (epoch != _epoch) return;
+      // Cache might be empty on first run; ignore.
+    }
 
     if (_subscribe) {
       _sub = q.snapshots().listen(
@@ -348,23 +366,45 @@ class FirestoreCollectionRepository<T extends JsonModel>
     QuerySnapshot<Map<String, dynamic>> snap, {
     bool fromOneShot = false,
   }) {
+    // Incremental: only re-parse changed documents.
+    for (final change in snap.docChanges) {
+      final doc = change.doc;
+      if (change.type == DocumentChangeType.removed) {
+        _modelCache.remove(doc.id);
+      } else if (doc.data() != null) {
+        final data = Map<String, dynamic>.from(doc.data()!)..['id'] = doc.id;
+        _modelCache[doc.id] = _fromJson(data);
+      }
+    }
+
+    // Build list in snapshot order using cached models.
     final list = <T>[];
     final activeIds = <String>{};
     for (final doc in snap.docs) {
-      final data = Map<String, dynamic>.from(doc.data())..['id'] = doc.id;
-      final model = _fromJson(data);
-      list.add(model);
       activeIds.add(doc.id);
-      _itemNotifiers.putIfAbsent(doc.id, () => ValueNotifier<T?>(model)).value =
-          model;
+      final model = _modelCache[doc.id];
+      if (model != null) {
+        list.add(model);
+      } else {
+        // Fallback: parse directly if not in cache.
+        final data = Map<String, dynamic>.from(doc.data())..['id'] = doc.id;
+        final m = _fromJson(data);
+        _modelCache[doc.id] = m;
+        list.add(m);
+      }
+      _itemNotifiers.putIfAbsent(doc.id, () => ValueNotifier<T?>(null)).value =
+          _modelCache[doc.id];
     }
 
-    // Null out notifiers for documents no longer in the snapshot.
-    for (final entry in _itemNotifiers.entries) {
-      if (!activeIds.contains(entry.key)) {
-        entry.value.value = null;
+    // Prune notifiers for documents no longer in the snapshot to prevent
+    // unbounded growth of _itemNotifiers over long sessions.
+    _itemNotifiers.removeWhere((id, notifier) {
+      if (!activeIds.contains(id)) {
+        notifier.value = null;
+        return true;
       }
-    }
+      return false;
+    });
 
     value = list;
     isLoading.value = false;
