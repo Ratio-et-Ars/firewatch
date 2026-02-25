@@ -213,4 +213,95 @@ void main() {
 
     repo.dispose();
   });
+
+  test('doc repo works in one-shot mode (subscribe: false)', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    await fs.doc('foos/u1').set({'name': 'OneShot'});
+
+    final repo = FirestoreDocRepository<Foo>(
+      firestore: fs,
+      fromJson: Foo.fromJson,
+      docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+      authUid: authUid,
+      subscribe: false,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value?.name, 'OneShot');
+    expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('doc repo one-shot with no existing document', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreDocRepository<Foo>(
+      firestore: fs,
+      fromJson: Foo.fromJson,
+      docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+      authUid: authUid,
+      subscribe: false,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value, isNull);
+    expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('doc repo update command works when authenticated', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    await fs.doc('foos/u1').set({'name': 'Alice'});
+
+    final repo = FirestoreDocRepository<Foo>(
+      firestore: fs,
+      fromJson: Foo.fromJson,
+      docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+      authUid: authUid,
+      subscribe: true,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    await repo.update.runAsync(Foo(id: 'u1', name: 'Bob'));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value?.name, 'Bob');
+
+    repo.dispose();
+  });
+
+  test('doc repo delete command works when authenticated', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    await fs.doc('foos/u1').set({'name': 'Alice'});
+
+    final repo = FirestoreDocRepository<Foo>(
+      firestore: fs,
+      fromJson: Foo.fromJson,
+      docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+      authUid: authUid,
+      subscribe: true,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value?.name, 'Alice');
+
+    await repo.delete.runAsync();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value, isNull);
+
+    repo.dispose();
+  });
 }
