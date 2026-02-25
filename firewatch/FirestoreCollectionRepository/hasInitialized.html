@@ -61,6 +61,11 @@
 
       </section>
       
+<section class="desc markdown">
+  <p>Whether the repository has completed its first query.</p>
+<p><code>false</code> until the first snapshot (or cache prime) arrives. Once <code>true</code>,
+it remains <code>true</code> until the next <a href="../../firewatch/FirestoreCollectionRepository/refresh.html">refresh</a> or auth change resets it.</p>
+</section>
 
       
 <section class="summary source-code" id="source">
@@ -94,7 +99,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      0.3.0
+      1.0.0
   </span>
   
 </footer>
