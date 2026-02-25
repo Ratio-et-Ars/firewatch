@@ -57,6 +57,9 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   // Active subscription (if any).
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _sub;
 
+  // Epoch counter to prevent stale async operations from updating state.
+  int _epoch = 0;
+
   // Expose loading state so UIs can show spinners/progress bars.
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(true);
 
@@ -73,13 +76,22 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
 
   void _onAuth() => _swap(_currentUserUid);
 
+  // Cancel without blocking the hot path.
+  void _cancelSubAsync() {
+    final old = _sub;
+    _sub = null;
+    if (old != null) {
+      unawaited(old.cancel());
+    }
+  }
+
   /// Attach to the correct document for the given [uid].
   Future<void> _swap(String? uid) async {
+    final epoch = ++_epoch;
     isLoading.value = true;
 
     // Stop previous stream
-    await _sub?.cancel();
-    _sub = null;
+    _cancelSubAsync();
 
     if (uid == null) {
       // Signed out: clear it all.
@@ -94,6 +106,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
     // 1) Prime from CACHE for instant UI, if available.
     try {
       final cacheSnap = await ref.get(const GetOptions(source: Source.cache));
+      if (epoch != _epoch) return; // stale
       if (cacheSnap.exists && cacheSnap.data() != null) {
         final data = Map<String, dynamic>.from(cacheSnap.data()!)
           ..['id'] = cacheSnap.id;
@@ -102,13 +115,21 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
         isLoading.value = false; // we have something useful already
       }
     } catch (_) {
+      if (epoch != _epoch) return; // stale
       // Cache might be empty on first run; ignore.
     }
 
     if (_subscribe) {
       // 2) Live updates; include metadata but ignore metadata-only churn.
       _sub = ref.snapshots(includeMetadataChanges: true).listen((snap) {
+        if (epoch != _epoch) return; // stale
+
         if (!snap.exists || snap.data() == null) {
+          // Document was deleted or is empty — clear value.
+          if (_lastData != null || value != null) {
+            _lastData = null;
+            value = null;
+          }
           if (!snap.metadata.hasPendingWrites) isLoading.value = false;
           return;
         }
@@ -125,6 +146,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
     } else {
       // One-shot; prefer server, fall back safely.
       final snap = await ref.get();
+      if (epoch != _epoch) return; // stale
       if (snap.exists && snap.data() != null) {
         final data = Map<String, dynamic>.from(snap.data()!)..['id'] = snap.id;
         _lastData = data;
@@ -135,32 +157,32 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   }
 
   // ── public write API (require signed-in user) ─────────────────────────────
-  late final write = Command.createAsync(
-    (T model, {bool merge = true}) async =>
-        (await _docOrThrow().set(model.toJson(), SetOptions(merge: merge))),
-    initialValue: null,
+  late final write = Command.createAsyncNoResult<T>(
+    (T model) =>
+        _docOrThrow().set(model.toJson(), SetOptions(merge: true)),
   );
 
-  late final update = Command.createAsync(
-    (T update) async => _docOrThrow().update(update.toJson()),
-    initialValue: null,
+  late final update = Command.createAsyncNoResult<T>(
+    (T model) => _docOrThrow().update(model.toJson()),
   );
 
-  late final patch = Command.createAsync<Map<String, dynamic>, void>(
-    (map) async => _docOrThrow().update(map),
-    initialValue: null,
+  late final patch = Command.createAsyncNoResult<Map<String, dynamic>>(
+    (map) => _docOrThrow().update(map),
   );
 
-  late final delete = Command.createAsyncNoParam(
+  late final delete = Command.createAsyncNoParamNoResult(
     () => _docOrThrow().delete(),
-    initialValue: null,
   );
 
   // ── lifecycle ─────────────────────────────────────────────────────────────
   @override
   void dispose() {
-    _sub?.cancel();
+    _cancelSubAsync();
     _authUid?.removeListener(_onAuth);
+    write.dispose();
+    update.dispose();
+    patch.dispose();
+    delete.dispose();
     isLoading.dispose();
     super.dispose();
   }

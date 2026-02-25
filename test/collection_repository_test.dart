@@ -132,5 +132,143 @@ void main() {
     // Expect filter uses 2022 (dep changed before auth)
     final ns = repo.value.map((e) => e.n).toList()..sort();
     expect(ns, [2022, 2023, 2024]);
+
+    repo.dispose();
+  });
+
+  test('collection repo CRUD commands work when authenticated', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Add a document
+    final docId = await repo.add.runAsync({'n': 42});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(docId, isNotNull);
+    expect(repo.value.length, 1);
+    expect(repo.value.first.n, 42);
+
+    // Patch the document
+    await repo.patch.runAsync((id: docId!, data: {'n': 99}));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.first.n, 99);
+
+    // Delete the document
+    await repo.delete.runAsync(docId);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value, isEmpty);
+
+    repo.dispose();
+  });
+
+  test('collection repo per-item notifiers reflect updates and deletions',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    final col = fs.collection('users/u1/items');
+    final ref = await col.add({'n': 1});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final notifier = repo.notifierFor(ref.id);
+    expect(notifier.value?.n, 1);
+
+    // Update the doc
+    await ref.update({'n': 2});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(notifier.value?.n, 2);
+
+    // Delete the doc — notifier should be nulled
+    await ref.delete();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(notifier.value, isNull);
+
+    repo.dispose();
+  });
+
+  test('collection repo dispose removes listeners', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    repo.dispose();
+
+    // Changing auth after dispose should not throw
+    authUid.value = 'u2';
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Value should remain as-is
+    expect(repo.value, isEmpty);
+  });
+
+  test('collection repo resets pagination on query change', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 2,
+    );
+
+    // Seed 4 docs
+    final col = fs.collection('users/u1/items');
+    for (var i = 0; i < 4; i++) {
+      await col.add({'n': i});
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 2); // first page
+    expect(repo.hasMore.value, isTrue);
+
+    // Load more to inflate the limit
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 4);
+
+    // Change query — should reset pagination
+    repo.setQuery((base) => base.where('n', isGreaterThan: 0));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Should be back to first page (2 items), not 4
+    expect(repo.value.length, 2);
+    expect(repo.hasMore.value, isTrue);
+
+    repo.dispose();
   });
 }

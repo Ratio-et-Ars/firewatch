@@ -216,7 +216,10 @@ class FirestoreCollectionRepository<T extends JsonModel>
   );
 
   // ── internals ─────────────────────────────────────────────────────────────
-  void _triggerRebuild() => _swap(_currentUserUid, clearExisting: true);
+  void _triggerRebuild() {
+    _limit.value = _pageSize; // reset pagination on query/dep/auth change
+    _swap(_currentUserUid, clearExisting: true);
+  }
 
   CollectionReference<Map<String, dynamic>> _colOrThrow() {
     final uid = _currentUserUid;
@@ -266,7 +269,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
         await _fetchOneShotEpoch(epoch);
       }
     } finally {
-      if (epoch == _epoch) _resizing = false;
+      _resizing = false;
     }
   }
 
@@ -346,12 +349,21 @@ class FirestoreCollectionRepository<T extends JsonModel>
     bool fromOneShot = false,
   }) {
     final list = <T>[];
+    final activeIds = <String>{};
     for (final doc in snap.docs) {
       final data = Map<String, dynamic>.from(doc.data())..['id'] = doc.id;
       final model = _fromJson(data);
       list.add(model);
+      activeIds.add(doc.id);
       _itemNotifiers.putIfAbsent(doc.id, () => ValueNotifier<T?>(model)).value =
           model;
+    }
+
+    // Null out notifiers for documents no longer in the snapshot.
+    for (final entry in _itemNotifiers.entries) {
+      if (!activeIds.contains(entry.key)) {
+        entry.value.value = null;
+      }
     }
 
     value = list;
@@ -365,12 +377,16 @@ class FirestoreCollectionRepository<T extends JsonModel>
   void dispose() {
     _limit.removeListener(_resizeWindow);
     _cancelSubAsync();
-    _sub?.cancel();
     _authUid?.removeListener(_triggerRebuild);
     _queryNotifier.removeListener(_triggerRebuild);
     for (final d in _deps) {
       d.removeListener(_triggerRebuild);
     }
+    add.dispose();
+    set.dispose();
+    patch.dispose();
+    update.dispose();
+    delete.dispose();
     _queryNotifier.dispose();
     isLoading.dispose();
     hasInitialized.dispose();
