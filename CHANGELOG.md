@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0
+
+### Improved
+- Collection repo now primes UI from Firestore local cache before starting the
+  live subscription, giving instant data on revisits
+- Incremental snapshot processing via `docChanges` — only re-parses
+  added/modified/removed documents instead of deserializing the full list on
+  every snapshot event
+- Per-item notifiers are now pruned (removed from the map) when documents leave
+  the snapshot, preventing unbounded memory growth over long sessions
+
 ## 0.2.0
 
 ### Breaking
