@@ -164,6 +164,10 @@ class FirestoreCollectionRepository<T extends JsonModel>
 
   String? get _currentUserUid => _authUid?.value;
 
+  /// Whether this repo requires authentication. True when [authUid] was
+  /// provided; false for public/unauthenticated collections.
+  bool get _isAuthGated => _authUid != null;
+
   // ── public API ────────────────────────────────────────────────────────────
 
   /// Swap the active query; pass `null` to clear and use base collection.
@@ -251,16 +255,16 @@ class FirestoreCollectionRepository<T extends JsonModel>
 
   CollectionReference<Map<String, dynamic>> _colOrThrow() {
     final uid = _currentUserUid;
-    if (uid == null) {
+    if (_isAuthGated && uid == null) {
       throw StateError('No signed-in user; repository is detached.');
     }
     return _colRefBuilder(_fs, uid);
   }
 
-  CollectionReference<Map<String, dynamic>> _colWith(String uid) =>
+  CollectionReference<Map<String, dynamic>> _colWith(String? uid) =>
       _colRefBuilder(_fs, uid);
 
-  Query<Map<String, dynamic>> _queryWith(String uid) {
+  Query<Map<String, dynamic>> _queryWith(String? uid) {
     final base = _colWith(uid);
     final qb = _queryNotifier.value;
     final q = qb == null ? base : qb(base);
@@ -270,7 +274,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   Future<void> _resizeWindow() async {
     if (_resizing) return;
     final uid = _currentUserUid;
-    if (uid == null) return;
+    if (_isAuthGated && uid == null) return;
 
     _resizing = true;
     final epoch = ++_epoch;
@@ -326,7 +330,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
 
     if (clearExisting) value = const [];
 
-    if (uid == null) {
+    if (_isAuthGated && uid == null) {
       hasInitialized.value = true;
       hasMore.value = false;
       isLoading.value = false;
@@ -369,7 +373,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   Future<void> _fetchOneShotEpoch(int epoch) async {
     try {
       final uid = _currentUserUid;
-      if (uid == null) {
+      if (_isAuthGated && uid == null) {
         if (epoch != _epoch) return;
         hasInitialized.value = true;
         return;

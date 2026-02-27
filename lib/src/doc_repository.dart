@@ -68,10 +68,14 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
 
   String? get _currentUserUid => _authUid?.value;
 
+  /// Whether this repo requires authentication. True when [authUid] was
+  /// provided; false for public/unauthenticated collections.
+  bool get _isAuthGated => _authUid != null;
+
   // ── helpers ───────────────────────────────────────────────────────────────
   DocumentReference<Map<String, dynamic>> _docOrThrow() {
     final uid = _currentUserUid;
-    if (uid == null) {
+    if (_isAuthGated && uid == null) {
       throw StateError('No signed-in user; repository is detached.');
     }
     return _docRefBuilder(_fs, uid);
@@ -96,7 +100,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
     // Stop previous stream
     _cancelSubAsync();
 
-    if (uid == null) {
+    if (_isAuthGated && uid == null) {
       // Signed out: clear it all.
       value = null;
       _lastData = null;
