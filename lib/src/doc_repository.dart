@@ -11,13 +11,24 @@ import 'json_model.dart';
 /// 3) Streams live updates (or can be one-shot),
 /// 4) Exposes simple write/update/patch/delete Commands.
 ///
-/// Usage:
+/// Auth-gated usage (per-user documents):
 /// ```dart
 /// final repo = FirestoreDocRepository<UserProfile>(
 ///   firestore: FirebaseFirestore.instance,
 ///   fromJson: (m) => UserProfile.fromJson(m),
 ///   docRefBuilder: (fs, uid) => fs.doc('users/$uid'),
 ///   authUid: myAuthUidListenable, // ValueListenable<String?>
+///   subscribe: true,
+/// );
+/// ```
+///
+/// Public usage (no auth required):
+/// ```dart
+/// final repo = FirestoreDocRepository<AppConfig>(
+///   firestore: FirebaseFirestore.instance,
+///   fromJson: (m) => AppConfig.fromJson(m),
+///   docRefBuilder: (fs, uid) => fs.doc('static/config'),
+///   // omit authUid — queries Firestore immediately
 ///   subscribe: true,
 /// );
 /// ```
@@ -29,7 +40,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
       String? uid,
     ) docRefBuilder,
     FirebaseFirestore? firestore,
-    AuthUidListenable? authUid, // optional auth source
+    AuthUidListenable? authUid, // omit for public/unauthenticated docs
     bool subscribe = true,
   })  : _fs = firestore ?? FirebaseFirestore.instance,
         _fromJson = fromJson,

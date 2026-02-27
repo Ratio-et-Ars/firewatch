@@ -49,6 +49,10 @@ typedef Patch = ({String id, Map<String, Object?> data});
 /// - Supports live queries (subscribe) or one-shot fetches
 /// - Exposes pagination via a live "window" (limit that grows with `loadMore`)
 /// - Keeps per-item notifiers in sync for efficient item detail widgets
+///
+/// Works with or without authentication. Omit [authUid] for public
+/// collections that should query Firestore immediately without waiting
+/// for a signed-in user.
 class FirestoreCollectionRepository<T extends JsonModel>
     extends ValueNotifier<List<T>> {
   /// Creates a new [FirestoreCollectionRepository].
@@ -61,7 +65,9 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// - [queryBuilder]: (Optional) Initial query mutator to apply filters,
   ///   ordering, or limits to the collection.
   /// - [authUid]: (Optional) A listenable source of the current user ID;
-  ///   repository will rebuild automatically when this changes.
+  ///   repository will rebuild automatically when this changes. Omit for
+  ///   public collections that don't require authentication — the repo will
+  ///   query immediately with `uid = null` passed to [colRefBuilder].
   /// - [dependencies]: (Optional) Extra [Listenable]s to watch; any change
   ///   triggers a query refresh.
   /// - [subscribe]: If true (default), repository stays in sync with
@@ -76,7 +82,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
     required ColRefBuilder colRefBuilder,
     FirebaseFirestore? firestore,
     QueryMutator? queryBuilder, // optional initial query
-    AuthUidListenable? authUid, // optional auth listenable
+    AuthUidListenable? authUid, // omit for public/unauthenticated collections
     List<Listenable> dependencies = const [], // extra listenables to watch
     bool subscribe = true, // realtime vs one-shot
     int pageSize = 25, // default page size
