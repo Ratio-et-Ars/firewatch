@@ -5,6 +5,7 @@ import 'package:firewatch/firewatch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+// ignore: subtype_of_sealed_class
 /// A minimal DocumentReference that emits errors on [snapshots] and [get].
 /// Used to test the onError stream callback in the doc repository.
 class _ErrorDocRef implements DocumentReference<Map<String, dynamic>> {

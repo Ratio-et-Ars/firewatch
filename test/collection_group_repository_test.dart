@@ -4,9 +4,9 @@ import 'package:firewatch/firewatch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+// ignore: subtype_of_sealed_class
 /// A minimal Query that emits an error on [snapshots] and [get].
 /// Used to test the onError stream callback in the repository.
-// ignore: subtype_of_sealed_class
 class _ErrorQuery implements Query<Map<String, dynamic>> {
   @override
   Stream<QuerySnapshot<Map<String, dynamic>>> snapshots({
@@ -455,28 +455,28 @@ void main() {
     repo.delete.errors.addListener(() {});
 
     // set
-    repo.set.execute(
+    repo.set.run(
       (path: 'users/u1/tasks/t1', model: Task(id: 't1', title: 'X')),
     );
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.set.errors.value?.error, isA<StateError>());
 
     // update
-    repo.update.execute(
+    repo.update.run(
       (path: 'users/u1/tasks/t1', model: Task(id: 't1', title: 'X')),
     );
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.update.errors.value?.error, isA<StateError>());
 
     // patch
-    repo.patch.execute(
+    repo.patch.run(
       (path: 'users/u1/tasks/t1', data: {'title': 'X'}),
     );
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.patch.errors.value?.error, isA<StateError>());
 
     // delete
-    repo.delete.execute('users/u1/tasks/t1');
+    repo.delete.run('users/u1/tasks/t1');
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.delete.errors.value?.error, isA<StateError>());
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.2.0
+
+### Added
+- `FirestoreCollectionGroupRepository<T>` — reactive queries across all
+  subcollections with the same name via Firestore `collectionGroup()`. Supports
+  live pagination, per-item notifiers keyed by full document path, and
+  path-based CRUD (`set`, `update`, `patch`, `delete`).
+- `QueryRefBuilder` typedef and `GroupPatch` record type for collection group
+  write operations
+- Updated README with collection group examples
+
+### Fixed
+- `FirestoreDocRepository` stream subscription now has an `onError` handler.
+  Previously a stream error (permission denied, network failure) would leave
+  `isLoading` stuck at `true` forever.
+
 ## 1.1.0
 
 ### Added

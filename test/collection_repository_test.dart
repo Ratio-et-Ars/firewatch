@@ -4,6 +4,7 @@ import 'package:firewatch/firewatch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+// ignore: subtype_of_sealed_class
 /// A minimal CollectionReference that emits errors on [snapshots] and [get].
 /// Used to test onError stream callbacks in the repository.
 class _ErrorCollectionRef implements CollectionReference<Map<String, dynamic>> {
@@ -670,23 +671,23 @@ void main() {
     repo.patch.errors.addListener(() {});
     repo.delete.errors.addListener(() {});
 
-    repo.add.execute({'n': 1});
+    repo.add.run({'n': 1});
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.add.errors.value?.error, isA<StateError>());
 
-    repo.set.execute(Item(id: 'x', n: 1));
+    repo.set.run(Item(id: 'x', n: 1));
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.set.errors.value?.error, isA<StateError>());
 
-    repo.update.execute(Item(id: 'x', n: 1));
+    repo.update.run(Item(id: 'x', n: 1));
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.update.errors.value?.error, isA<StateError>());
 
-    repo.patch.execute((id: 'x', data: {'n': 1}));
+    repo.patch.run((id: 'x', data: {'n': 1}));
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.patch.errors.value?.error, isA<StateError>());
 
-    repo.delete.execute('x');
+    repo.delete.run('x');
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.delete.errors.value?.error, isA<StateError>());
 
