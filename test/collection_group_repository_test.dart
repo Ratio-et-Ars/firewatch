@@ -1,7 +1,31 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firewatch/firewatch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// A minimal Query that emits an error on [snapshots] and [get].
+/// Used to test the onError stream callback in the repository.
+// ignore: subtype_of_sealed_class
+class _ErrorQuery implements Query<Map<String, dynamic>> {
+  @override
+  Stream<QuerySnapshot<Map<String, dynamic>>> snapshots({
+    bool includeMetadataChanges = false,
+    ListenSource? source,
+  }) =>
+      Stream.error(Exception('Simulated stream error'));
+
+  @override
+  Future<QuerySnapshot<Map<String, dynamic>>> get([GetOptions? options]) =>
+      Future.error(Exception('Simulated get error'));
+
+  @override
+  Query<Map<String, dynamic>> limit(int limit) => this;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName}');
+}
 
 class Task implements JsonModel {
   @override
@@ -533,6 +557,56 @@ void main() {
 
     expect(repo.value, isEmpty);
     expect(repo.hasInitialized.value, isTrue);
+    expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('onError callback sets isLoading false on stream error (_swap)',
+      () async {
+    final fs = FakeFirebaseFirestore();
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => _ErrorQuery(),
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // The stream errored; onError should have set isLoading to false
+    // and hasInitialized to true.
+    expect(repo.isLoading.value, isFalse);
+    expect(repo.hasInitialized.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('onError callback sets isLoading false on stream error (_resizeWindow)',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    await _seed(fs);
+
+    var useError = false;
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) =>
+          useError ? _ErrorQuery() : f.collectionGroup('tasks'),
+      subscribe: true,
+      pageSize: 2,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+
+    // Switch to error-producing query, then loadMore triggers _resizeWindow
+    useError = true;
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
     expect(repo.isLoading.value, isFalse);
 
     repo.dispose();
