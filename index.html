@@ -48,7 +48,7 @@
 <ul>
 <li>🔁 <strong>Auth-reactive</strong>: attach/detach on UID changes via any <code>ValueListenable&lt;String?&gt;</code></li>
 <li>⚡ <strong>Instant UI</strong>: primes from local cache; then streams live updates</li>
-<li>🪶 <strong>Small surface area</strong>: single-doc + collection repos</li>
+<li>🪶 <strong>Small surface area</strong>: single-doc, collection, and collection-group repos</li>
 <li>📜 <strong>Live window pagination</strong>: grow with <code>loadMore()</code>, reset via <code>resetPages()</code></li>
 <li>🧩 <strong>No auth lock-in</strong>: bring your own auth listenable</li>
 </ul>
@@ -103,6 +103,17 @@ class FriendsRepository extends FirestoreCollectionRepository&lt;UserProfile&gt;
           authUid: authUid,
         );
 }
+
+/// Query across ALL "friends" subcollections regardless of parent.
+class AllFriendsRepository
+    extends FirestoreCollectionGroupRepository&lt;UserProfile&gt; {
+  AllFriendsRepository()
+      : super(
+          fromJson: UserProfile.fromJson,
+          queryRefBuilder: (fs, uid) =&gt; fs.collectionGroup('friends'),
+          authUid: authUid,
+        );
+}
 </code></pre>
 <hr>
 <h3 id="3-consume-in-the-ui-with-watch_it">3. Consume in the UI with <code>watch_it</code></h3>
@@ -138,20 +149,25 @@ Update it on sign-in/out and the repos will re-attach.</p>
 authUid.value = null; // sign out
 </code></pre>
 <h2 id="commands-api">Commands API</h2>
-<p>Both repos expose <a href="https://pub.dev/packages/command_it"><code>command_it</code></a> async
+<p>All repos expose <a href="https://pub.dev/packages/command_it"><code>command_it</code></a> async
 commands:</p>
 <pre class="language-dart"><code class="language-dart">profileRepo.write(UserProfile(id: 'abc123', displayName: 'Marty'));
 profileRepo.patch({'bio': 'Hello'});
 
 friendsRepo.add({'displayName': 'Alice'});
 friendsRepo.delete(id!);
+
+// Collection-group writes use full document paths (no .add()):
+allFriendsRepo.set((path: 'users/abc123/friends/f1', model: friend));
+allFriendsRepo.patch((path: 'users/abc123/friends/f1', data: {'name': 'Bob'}));
+allFriendsRepo.delete('users/abc123/friends/f1');
 </code></pre>
 <h2 id="ui-state">UI State</h2>
 <ul>
 <li><code>isLoading</code>: true while fetching/refreshing</li>
 <li><code>hasInitialized</code> (collections): first load completed</li>
 <li><code>hasMore</code> (collections): whether <code>loadMore()</code> can grow the window</li>
-<li><code>notifierFor(docId)</code>: get a pre-soaked <code>ValueNotifier&lt;T?&gt;</code> for a specific item</li>
+<li><code>notifierFor(docId)</code>: get a pre-soaked <code>ValueNotifier&lt;T?&gt;</code> for a specific item (keyed by doc path for collection groups)</li>
 </ul>
 <h2 id="documentation">Documentation</h2>
 <p><a href="https://ratio-et-ars.github.io/firewatch/"><img src="https://img.shields.io/badge/docs-api-blue" alt="API Docs"></a></p>
