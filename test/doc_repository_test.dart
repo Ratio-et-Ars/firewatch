@@ -1,8 +1,30 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:command_it/command_it.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firewatch/firewatch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// A minimal DocumentReference that emits errors on [snapshots] and [get].
+/// Used to test the onError stream callback in the doc repository.
+class _ErrorDocRef implements DocumentReference<Map<String, dynamic>> {
+  @override
+  Stream<DocumentSnapshot<Map<String, dynamic>>> snapshots({
+    bool includeMetadataChanges = false,
+    ListenSource? source,
+  }) =>
+      Stream.error(Exception('Simulated stream error'));
+
+  @override
+  Future<DocumentSnapshot<Map<String, dynamic>>> get([
+    GetOptions? options,
+  ]) =>
+      Future.error(Exception('Simulated get error'));
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName}');
+}
 
 class Foo implements JsonModel {
   @override
@@ -335,6 +357,24 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.value, isNull);
+
+    repo.dispose();
+  });
+
+  test('onError callback sets isLoading false on stream error', () async {
+    final fs = FakeFirebaseFirestore();
+
+    final repo = FirestoreDocRepository<Foo>(
+      firestore: fs,
+      fromJson: Foo.fromJson,
+      docRefBuilder: (f, uid) => _ErrorDocRef(),
+      subscribe: true,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // The stream errored; onError should have set isLoading to false.
+    expect(repo.isLoading.value, isFalse);
 
     repo.dispose();
   });

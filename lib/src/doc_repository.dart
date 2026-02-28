@@ -139,28 +139,35 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
 
     if (_subscribe) {
       // 2) Live updates; include metadata but ignore metadata-only churn.
-      _sub = ref.snapshots(includeMetadataChanges: true).listen((snap) {
-        if (epoch != _epoch) return; // stale
+      _sub = ref.snapshots(includeMetadataChanges: true).listen(
+        (snap) {
+          if (epoch != _epoch) return; // stale
 
-        if (!snap.exists || snap.data() == null) {
-          // Document was deleted or is empty — clear value.
-          if (_lastData != null || value != null) {
-            _lastData = null;
-            value = null;
+          if (!snap.exists || snap.data() == null) {
+            // Document was deleted or is empty — clear value.
+            if (_lastData != null || value != null) {
+              _lastData = null;
+              value = null;
+            }
+            if (!snap.metadata.hasPendingWrites) isLoading.value = false;
+            return;
           }
+
+          final next =
+              Map<String, dynamic>.from(snap.data()!)..['id'] = snap.id;
+
+          if (!mapEquals(_lastData, next)) {
+            _lastData = next;
+            value = _fromJson(next);
+          }
+
           if (!snap.metadata.hasPendingWrites) isLoading.value = false;
-          return;
-        }
-
-        final next = Map<String, dynamic>.from(snap.data()!)..['id'] = snap.id;
-
-        if (!mapEquals(_lastData, next)) {
-          _lastData = next;
-          value = _fromJson(next);
-        }
-
-        if (!snap.metadata.hasPendingWrites) isLoading.value = false;
-      });
+        },
+        onError: (_) {
+          if (epoch != _epoch) return;
+          isLoading.value = false;
+        },
+      );
     } else {
       // One-shot; prefer server, fall back safely.
       final snap = await ref.get();
