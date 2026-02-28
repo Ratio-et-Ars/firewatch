@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0
+
+### Added
+- `parentId` is now automatically injected into the data map before calling
+  `fromJson` across all three repository types. Models can opt-in by declaring
+  a `parentId` field in their `fromJson` factory — no changes to `JsonModel`
+  required. Particularly useful for collection group queries where documents
+  with the same ID can live under different parents.
+
 ## 1.2.0
 
 ### Added

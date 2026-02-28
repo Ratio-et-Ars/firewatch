@@ -120,6 +120,40 @@ class ProfileCard extends StatelessWidget {
 👉 For a **full runnable demo** (with auth wiring and fake Firestore), check
 out the [example/](example/) app in this repo.
 
+## Parent ID injection
+
+All repositories automatically inject `parentId` into the data map before
+calling `fromJson`. This is the document ID of the **parent** document in the
+Firestore path hierarchy. Models can opt-in by declaring a `parentId` field —
+no changes to `JsonModel` required.
+
+This is especially useful for **collection group queries**, where two documents
+can share the same `id` but live under different parents
+(`users/u1/tasks/t1` vs `projects/p1/tasks/t1`).
+
+```dart
+class Task implements JsonModel {
+  @override
+  final String id;
+  final String title;
+  final String? parentId; // opt-in — injected automatically
+
+  Task({required this.id, required this.title, this.parentId});
+
+  factory Task.fromJson(Map<String, dynamic> json) => Task(
+        id: json['id'] as String,
+        title: json['title'] as String? ?? '',
+        parentId: json['parentId'] as String?,
+      );
+
+  @override
+  Map<String, dynamic> toJson() => {'title': title};
+}
+```
+
+For a document at `users/u1/tasks/t1`, `parentId` will be `'u1'`.
+For a top-level document like `users/u1`, `parentId` will be `null`.
+
 ## Bring your own Auth
 
 Firewatch accepts any ValueListenable<String?> that yields the current user UID.
