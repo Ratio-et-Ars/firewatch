@@ -49,6 +49,10 @@ typedef Patch = ({String id, Map<String, Object?> data});
 /// - Supports live queries (subscribe) or one-shot fetches
 /// - Exposes pagination via a live "window" (limit that grows with `loadMore`)
 /// - Keeps per-item notifiers in sync for efficient item detail widgets
+///
+/// Works with or without authentication. Omit [authUid] for public
+/// collections that should query Firestore immediately without waiting
+/// for a signed-in user.
 class FirestoreCollectionRepository<T extends JsonModel>
     extends ValueNotifier<List<T>> {
   /// Creates a new [FirestoreCollectionRepository].
@@ -61,7 +65,9 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// - [queryBuilder]: (Optional) Initial query mutator to apply filters,
   ///   ordering, or limits to the collection.
   /// - [authUid]: (Optional) A listenable source of the current user ID;
-  ///   repository will rebuild automatically when this changes.
+  ///   repository will rebuild automatically when this changes. Omit for
+  ///   public collections that don't require authentication — the repo will
+  ///   query immediately with `uid = null` passed to [colRefBuilder].
   /// - [dependencies]: (Optional) Extra [Listenable]s to watch; any change
   ///   triggers a query refresh.
   /// - [subscribe]: If true (default), repository stays in sync with
@@ -76,7 +82,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
     required ColRefBuilder colRefBuilder,
     FirebaseFirestore? firestore,
     QueryMutator? queryBuilder, // optional initial query
-    AuthUidListenable? authUid, // optional auth listenable
+    AuthUidListenable? authUid, // omit for public/unauthenticated collections
     List<Listenable> dependencies = const [], // extra listenables to watch
     bool subscribe = true, // realtime vs one-shot
     int pageSize = 25, // default page size
@@ -163,6 +169,10 @@ class FirestoreCollectionRepository<T extends JsonModel>
       hasInitialized.value && !isLoading.value && value.isEmpty;
 
   String? get _currentUserUid => _authUid?.value;
+
+  /// Whether this repo requires authentication. True when [authUid] was
+  /// provided; false for public/unauthenticated collections.
+  bool get _isAuthGated => _authUid != null;
 
   // ── public API ────────────────────────────────────────────────────────────
 
@@ -251,16 +261,16 @@ class FirestoreCollectionRepository<T extends JsonModel>
 
   CollectionReference<Map<String, dynamic>> _colOrThrow() {
     final uid = _currentUserUid;
-    if (uid == null) {
+    if (_isAuthGated && uid == null) {
       throw StateError('No signed-in user; repository is detached.');
     }
     return _colRefBuilder(_fs, uid);
   }
 
-  CollectionReference<Map<String, dynamic>> _colWith(String uid) =>
+  CollectionReference<Map<String, dynamic>> _colWith(String? uid) =>
       _colRefBuilder(_fs, uid);
 
-  Query<Map<String, dynamic>> _queryWith(String uid) {
+  Query<Map<String, dynamic>> _queryWith(String? uid) {
     final base = _colWith(uid);
     final qb = _queryNotifier.value;
     final q = qb == null ? base : qb(base);
@@ -270,7 +280,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   Future<void> _resizeWindow() async {
     if (_resizing) return;
     final uid = _currentUserUid;
-    if (uid == null) return;
+    if (_isAuthGated && uid == null) return;
 
     _resizing = true;
     final epoch = ++_epoch;
@@ -326,7 +336,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
 
     if (clearExisting) value = const [];
 
-    if (uid == null) {
+    if (_isAuthGated && uid == null) {
       hasInitialized.value = true;
       hasMore.value = false;
       isLoading.value = false;
@@ -369,7 +379,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   Future<void> _fetchOneShotEpoch(int epoch) async {
     try {
       final uid = _currentUserUid;
-      if (uid == null) {
+      if (_isAuthGated && uid == null) {
         if (epoch != _epoch) return;
         hasInitialized.value = true;
         return;

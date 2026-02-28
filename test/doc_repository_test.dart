@@ -280,6 +280,40 @@ void main() {
     repo.dispose();
   });
 
+  test('doc repo works without authUid (public doc)', () async {
+    final fs = FakeFirebaseFirestore();
+
+    await fs.doc('static/prompts').set({'name': 'Hello'});
+
+    final repo = FirestoreDocRepository<Foo>(
+      firestore: fs,
+      fromJson: Foo.fromJson,
+      docRefBuilder: (f, uid) => f.doc('static/prompts'),
+      // no authUid — public collection
+      subscribe: true,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value?.name, 'Hello');
+    expect(repo.isLoading.value, isFalse);
+
+    // Update the doc — repo should stream the change
+    await fs.doc('static/prompts').update({'name': 'World'});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value?.name, 'World');
+
+    // CRUD still works
+    await repo.write.runAsync(Foo(id: 'prompts', name: 'Written'));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final snap = await fs.doc('static/prompts').get();
+    expect(snap.data()?['name'], 'Written');
+
+    repo.dispose();
+  });
+
   test('doc repo delete command works when authenticated', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>('u1');

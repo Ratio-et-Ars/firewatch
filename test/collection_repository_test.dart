@@ -489,6 +489,66 @@ void main() {
     repo.dispose();
   });
 
+  test('collection repo works without authUid (public collection)', () async {
+    final fs = FakeFirebaseFirestore();
+
+    final col = fs.collection('publicItems');
+    for (var i = 0; i < 3; i++) {
+      await col.add({'n': i});
+    }
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('publicItems'),
+      // no authUid — public collection
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 3);
+    expect(repo.isLoading.value, isFalse);
+    expect(repo.hasInitialized.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('collection repo CRUD works without authUid', () async {
+    final fs = FakeFirebaseFirestore();
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('publicItems'),
+      // no authUid — public collection
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Add
+    final docId = await repo.add.runAsync({'n': 42});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(docId, isNotNull);
+    expect(repo.value.length, 1);
+    expect(repo.value.first.n, 42);
+
+    // Patch
+    await repo.patch.runAsync((id: docId!, data: {'n': 99}));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.first.n, 99);
+
+    // Delete
+    await repo.delete.runAsync(docId);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value, isEmpty);
+
+    repo.dispose();
+  });
+
   test('collection repo one-shot signed out returns empty', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>(null);
