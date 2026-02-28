@@ -4,7 +4,7 @@ Lightweight Firestore repositories for Flutter.
 
 - 🔁 **Auth-reactive**: attach/detach on UID changes via any `ValueListenable<String?>`
 - ⚡ **Instant UI**: primes from local cache; then streams live updates
-- 🪶 **Small surface area**: single-doc + collection repos
+- 🪶 **Small surface area**: single-doc, collection, and collection-group repos
 - 📜 **Live window pagination**: grow with `loadMore()`, reset via `resetPages()`
 - 🧩 **No auth lock-in**: bring your own auth listenable
 
@@ -73,6 +73,17 @@ class FriendsRepository extends FirestoreCollectionRepository<UserProfile> {
           authUid: authUid,
         );
 }
+
+/// Query across ALL "friends" subcollections regardless of parent.
+class AllFriendsRepository
+    extends FirestoreCollectionGroupRepository<UserProfile> {
+  AllFriendsRepository()
+      : super(
+          fromJson: UserProfile.fromJson,
+          queryRefBuilder: (fs, uid) => fs.collectionGroup('friends'),
+          authUid: authUid,
+        );
+}
 ```
 
 ---
@@ -121,7 +132,7 @@ authUid.value = null; // sign out
 
 ## Commands API
 
-Both repos expose [`command_it`](https://pub.dev/packages/command_it) async
+All repos expose [`command_it`](https://pub.dev/packages/command_it) async
 commands:
 
 ```dart
@@ -130,6 +141,11 @@ profileRepo.patch({'bio': 'Hello'});
 
 friendsRepo.add({'displayName': 'Alice'});
 friendsRepo.delete(id!);
+
+// Collection-group writes use full document paths (no .add()):
+allFriendsRepo.set((path: 'users/abc123/friends/f1', model: friend));
+allFriendsRepo.patch((path: 'users/abc123/friends/f1', data: {'name': 'Bob'}));
+allFriendsRepo.delete('users/abc123/friends/f1');
 ```
 
 ## UI State
@@ -137,7 +153,7 @@ friendsRepo.delete(id!);
 - `isLoading`: true while fetching/refreshing
 - `hasInitialized` (collections): first load completed
 - `hasMore` (collections): whether `loadMore()` can grow the window
-- `notifierFor(docId)`: get a pre-soaked `ValueNotifier<T?>` for a specific item
+- `notifierFor(docId)`: get a pre-soaked `ValueNotifier<T?>` for a specific item (keyed by doc path for collection groups)
 
 ## Documentation
 
