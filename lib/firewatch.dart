@@ -20,6 +20,7 @@
 /// ```
 library;
 
+export 'src/collection_group_repository.dart';
 export 'src/collection_repository.dart';
 export 'src/doc_repository.dart';
 
