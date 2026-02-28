@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0
+
+### Added
+- Repositories now work without `authUid` for public/unauthenticated
+  collections (e.g. `static/config`). Omitting `authUid` queries Firestore
+  immediately instead of waiting for a signed-in user.
+- Updated doc comments with public-collection usage examples
+
 ## 1.0.0
 
 - Stable release — no API changes, just documentation polish
