@@ -61,6 +61,9 @@
 <li>Exposes pagination via a live "window" (limit that grows with <code>loadMore</code>)</li>
 <li>Keeps per-item notifiers in sync for efficient item detail widgets</li>
 </ul>
+<p>Works with or without authentication. Omit <code>authUid</code> for public
+collections that should query Firestore immediately without waiting
+for a signed-in user.</p>
 </section>
 
 

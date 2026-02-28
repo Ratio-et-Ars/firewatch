@@ -61,12 +61,21 @@
 <li>Streams live updates (or can be one-shot),</li>
 <li>Exposes simple write/update/patch/delete Commands.</li>
 </ol>
-<p>Usage:</p>
+<p>Auth-gated usage (per-user documents):</p>
 <pre class="language-dart"><code class="language-dart">final repo = FirestoreDocRepository&lt;UserProfile&gt;(
   firestore: FirebaseFirestore.instance,
   fromJson: (m) =&gt; UserProfile.fromJson(m),
   docRefBuilder: (fs, uid) =&gt; fs.doc('users/$uid'),
   authUid: myAuthUidListenable, // ValueListenable&lt;String?&gt;
+  subscribe: true,
+);
+</code></pre>
+<p>Public usage (no auth required):</p>
+<pre class="language-dart"><code class="language-dart">final repo = FirestoreDocRepository&lt;AppConfig&gt;(
+  firestore: FirebaseFirestore.instance,
+  fromJson: (m) =&gt; AppConfig.fromJson(m),
+  docRefBuilder: (fs, uid) =&gt; fs.doc('static/config'),
+  // omit authUid — queries Firestore immediately
   subscribe: true,
 );
 </code></pre>

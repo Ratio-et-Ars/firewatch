@@ -78,7 +78,9 @@
 <li><code>queryBuilder</code>: (Optional) Initial query mutator to apply filters,
 ordering, or limits to the collection.</li>
 <li><code>authUid</code>: (Optional) A listenable source of the current user ID;
-repository will rebuild automatically when this changes.</li>
+repository will rebuild automatically when this changes. Omit for
+public collections that don't require authentication — the repo will
+query immediately with <code>uid = null</code> passed to <code>colRefBuilder</code>.</li>
 <li><code>dependencies</code>: (Optional) Extra <a href="https://api.flutter.dev/flutter/foundation/Listenable-class.html">Listenable</a>s to watch; any change
 triggers a query refresh.</li>
 <li><code>subscribe</code>: If true (default), repository stays in sync with
@@ -99,7 +101,7 @@ immediately against the resolved collection for the current user.</p>
   required ColRefBuilder colRefBuilder,
   FirebaseFirestore? firestore,
   QueryMutator? queryBuilder, &#47;&#47; optional initial query
-  AuthUidListenable? authUid, &#47;&#47; optional auth listenable
+  AuthUidListenable? authUid, &#47;&#47; omit for public&#47;unauthenticated collections
   List&lt;Listenable&gt; dependencies = const [], &#47;&#47; extra listenables to watch
   bool subscribe = true, &#47;&#47; realtime vs one-shot
   int pageSize = 25, &#47;&#47; default page size

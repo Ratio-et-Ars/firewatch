@@ -77,7 +77,7 @@
     String? uid,
   ) docRefBuilder,
   FirebaseFirestore? firestore,
-  AuthUidListenable? authUid, &#47;&#47; optional auth source
+  AuthUidListenable? authUid, &#47;&#47; omit for public&#47;unauthenticated docs
   bool subscribe = true,
 })  : _fs = firestore ?? FirebaseFirestore.instance,
       _fromJson = fromJson,
