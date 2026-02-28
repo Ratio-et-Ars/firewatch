@@ -40,6 +40,23 @@ class Foo implements JsonModel {
   Map<String, dynamic> toJson() => {'name': name};
 }
 
+class FooWithParent implements JsonModel {
+  @override
+  final String id;
+  final String name;
+  final String? parentId;
+  FooWithParent({required this.id, required this.name, this.parentId});
+
+  factory FooWithParent.fromJson(Map<String, dynamic> m) => FooWithParent(
+    id: m['id'] as String,
+    name: m['name'] as String? ?? '',
+    parentId: m['parentId'] as String?,
+  );
+
+  @override
+  Map<String, dynamic> toJson() => {'name': name};
+}
+
 void main() {
   test('doc repo attaches on auth and streams updates', () async {
     final fs = FakeFirebaseFirestore();
@@ -358,6 +375,29 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.value, isNull);
+
+    repo.dispose();
+  });
+
+  test('parentId is injected from parent document reference', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    await fs.doc('users/u1/profile/main').set({'name': 'Alice'});
+
+    final repo = FirestoreDocRepository<FooWithParent>(
+      firestore: fs,
+      fromJson: FooWithParent.fromJson,
+      docRefBuilder: (f, uid) => f.doc('users/$uid/profile/main'),
+      authUid: authUid,
+      subscribe: true,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value?.id, 'main');
+    expect(repo.value?.name, 'Alice');
+    expect(repo.value?.parentId, 'u1');
 
     repo.dispose();
   });

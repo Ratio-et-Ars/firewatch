@@ -47,6 +47,23 @@ Future<void> _seed(FakeFirebaseFirestore fs) async {
   await fs.doc('projects/p1/tasks/t3').set({'title': 'Task 3'});
 }
 
+class TaskWithParent implements JsonModel {
+  @override
+  final String id;
+  final String title;
+  final String? parentId;
+  TaskWithParent({required this.id, required this.title, this.parentId});
+
+  factory TaskWithParent.fromJson(Map<String, dynamic> m) => TaskWithParent(
+    id: m['id'] as String,
+    title: (m['title'] as String?) ?? '',
+    parentId: m['parentId'] as String?,
+  );
+
+  @override
+  Map<String, dynamic> toJson() => {'title': title};
+}
+
 void main() {
   test('returns documents from multiple parent paths', () async {
     final fs = FakeFirebaseFirestore();
@@ -558,6 +575,30 @@ void main() {
     expect(repo.value, isEmpty);
     expect(repo.hasInitialized.value, isTrue);
     expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('parentId is injected from parent document reference', () async {
+    final fs = FakeFirebaseFirestore();
+    await fs.doc('users/u1/tasks/t1').set({'title': 'User task'});
+    await fs.doc('projects/p1/tasks/t2').set({'title': 'Project task'});
+
+    final repo = FirestoreCollectionGroupRepository<TaskWithParent>(
+      firestore: fs,
+      fromJson: TaskWithParent.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 2);
+
+    final byId = {for (final t in repo.value) t.id: t};
+    expect(byId['t1']?.parentId, 'u1');
+    expect(byId['t2']?.parentId, 'p1');
 
     repo.dispose();
   });

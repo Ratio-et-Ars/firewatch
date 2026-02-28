@@ -406,7 +406,9 @@ class FirestoreCollectionRepository<T extends JsonModel>
       if (change.type == DocumentChangeType.removed) {
         _modelCache.remove(doc.id);
       } else if (doc.data() != null) {
-        final data = Map<String, dynamic>.from(doc.data()!)..['id'] = doc.id;
+        final data = Map<String, dynamic>.from(doc.data()!)
+          ..['id'] = doc.id
+          ..['parentId'] = doc.reference.parent.parent?.id;
         _modelCache[doc.id] = _fromJson(data);
       }
     }
@@ -421,7 +423,9 @@ class FirestoreCollectionRepository<T extends JsonModel>
         list.add(model);
       } else {
         // Fallback: parse directly if not in cache.
-        final data = Map<String, dynamic>.from(doc.data())..['id'] = doc.id;
+        final data = Map<String, dynamic>.from(doc.data())
+          ..['id'] = doc.id
+          ..['parentId'] = doc.reference.parent.parent?.id;
         final m = _fromJson(data);
         _modelCache[doc.id] = m;
         list.add(m);
