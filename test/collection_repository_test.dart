@@ -1,7 +1,30 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firewatch/firewatch.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// A minimal CollectionReference that emits errors on [snapshots] and [get].
+/// Used to test onError stream callbacks in the repository.
+class _ErrorCollectionRef implements CollectionReference<Map<String, dynamic>> {
+  @override
+  Stream<QuerySnapshot<Map<String, dynamic>>> snapshots({
+    bool includeMetadataChanges = false,
+    ListenSource? source,
+  }) =>
+      Stream.error(Exception('Simulated stream error'));
+
+  @override
+  Future<QuerySnapshot<Map<String, dynamic>>> get([GetOptions? options]) =>
+      Future.error(Exception('Simulated get error'));
+
+  @override
+  Query<Map<String, dynamic>> limit(int limit) => this;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName}');
+}
 
 class Item implements JsonModel {
   @override
@@ -567,6 +590,105 @@ void main() {
     expect(repo.value, isEmpty);
     expect(repo.hasInitialized.value, isTrue);
     expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('onError callback sets isLoading false on stream error (_swap)',
+      () async {
+    final fs = FakeFirebaseFirestore();
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => _ErrorCollectionRef(),
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.isLoading.value, isFalse);
+    expect(repo.hasInitialized.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('onError callback sets isLoading false on stream error (_resizeWindow)',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    for (var i = 0; i < 3; i++) {
+      await col.add({'n': i});
+    }
+
+    var useError = false;
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) =>
+          useError ? _ErrorCollectionRef() : f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 2,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+
+    // Switch to error-producing ref, then loadMore triggers _resizeWindow
+    useError = true;
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('CRUD commands error when auth-gated and signed out', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Register local error listeners so command_it routes errors locally.
+    repo.add.errors.addListener(() {});
+    repo.set.errors.addListener(() {});
+    repo.update.errors.addListener(() {});
+    repo.patch.errors.addListener(() {});
+    repo.delete.errors.addListener(() {});
+
+    repo.add.execute({'n': 1});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.add.errors.value?.error, isA<StateError>());
+
+    repo.set.execute(Item(id: 'x', n: 1));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.set.errors.value?.error, isA<StateError>());
+
+    repo.update.execute(Item(id: 'x', n: 1));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.update.errors.value?.error, isA<StateError>());
+
+    repo.patch.execute((id: 'x', data: {'n': 1}));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.patch.errors.value?.error, isA<StateError>());
+
+    repo.delete.execute('x');
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.delete.errors.value?.error, isA<StateError>());
 
     repo.dispose();
   });
