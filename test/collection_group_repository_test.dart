@@ -408,4 +408,83 @@ void main() {
 
     repo.dispose();
   });
+
+  test('resetPages resets to first page', () async {
+    final fs = FakeFirebaseFirestore();
+    await _seed(fs);
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      subscribe: true,
+      pageSize: 2,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 3);
+
+    await repo.resetPages();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+    expect(repo.hasMore.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('extra dependencies trigger rebuild', () async {
+    final fs = FakeFirebaseFirestore();
+    final dep = ValueNotifier<int>(0);
+
+    await fs.doc('users/u1/tasks/t1').set({'title': 'A'});
+    await fs.doc('users/u2/tasks/t2').set({'title': 'B'});
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      dependencies: [dep],
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+
+    // Add a doc and change dep to trigger rebuild
+    await fs.doc('projects/p1/tasks/t3').set({'title': 'C'});
+    dep.value = 1;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 3);
+
+    repo.dispose();
+  });
+
+  test('one-shot mode signed out returns empty', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+    await _seed(fs);
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      authUid: authUid,
+      subscribe: false,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value, isEmpty);
+    expect(repo.hasInitialized.value, isTrue);
+    expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
 }
