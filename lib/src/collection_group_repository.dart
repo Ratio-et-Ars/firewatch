@@ -372,7 +372,9 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
       if (change.type == DocumentChangeType.removed) {
         _modelCache.remove(path);
       } else if (doc.data() != null) {
-        final data = Map<String, dynamic>.from(doc.data()!)..['id'] = doc.id;
+        final data = Map<String, dynamic>.from(doc.data()!)
+          ..['id'] = doc.id
+          ..['parentId'] = doc.reference.parent.parent?.id;
         _modelCache[path] = _fromJson(data);
       }
     }
@@ -387,7 +389,9 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
       if (model != null) {
         list.add(model);
       } else {
-        final data = Map<String, dynamic>.from(doc.data())..['id'] = doc.id;
+        final data = Map<String, dynamic>.from(doc.data())
+          ..['id'] = doc.id
+          ..['parentId'] = doc.reference.parent.parent?.id;
         final m = _fromJson(data);
         _modelCache[path] = m;
         list.add(m);

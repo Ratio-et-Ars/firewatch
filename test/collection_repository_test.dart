@@ -40,6 +40,23 @@ class Item implements JsonModel {
   Map<String, dynamic> toJson() => {'n': n};
 }
 
+class ItemWithParent implements JsonModel {
+  @override
+  final String id;
+  final int n;
+  final String? parentId;
+  ItemWithParent({required this.id, required this.n, this.parentId});
+
+  factory ItemWithParent.fromJson(Map<String, dynamic> m) => ItemWithParent(
+    id: m['id'] as String,
+    n: (m['n'] as num?)?.toInt() ?? 0,
+    parentId: m['parentId'] as String?,
+  );
+
+  @override
+  Map<String, dynamic> toJson() => {'n': n};
+}
+
 void main() {
   test('collection repo paginates with live window', () async {
     final fs = FakeFirebaseFirestore();
@@ -645,6 +662,33 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('parentId is injected from parent document reference', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/tasks');
+    await col.doc('t1').set({'n': 1});
+    await col.doc('t2').set({'n': 2});
+
+    final repo = FirestoreCollectionRepository<ItemWithParent>(
+      firestore: fs,
+      fromJson: ItemWithParent.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/tasks'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 2);
+    for (final item in repo.value) {
+      expect(item.parentId, 'u1');
+    }
 
     repo.dispose();
   });
