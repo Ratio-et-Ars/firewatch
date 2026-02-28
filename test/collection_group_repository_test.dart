@@ -409,6 +409,56 @@ void main() {
     repo.dispose();
   });
 
+  test('write commands error when auth-gated and signed out', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Register local error listeners so command_it routes errors locally.
+    repo.set.errors.addListener(() {});
+    repo.update.errors.addListener(() {});
+    repo.patch.errors.addListener(() {});
+    repo.delete.errors.addListener(() {});
+
+    // set
+    repo.set.execute(
+      (path: 'users/u1/tasks/t1', model: Task(id: 't1', title: 'X')),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.set.errors.value?.error, isA<StateError>());
+
+    // update
+    repo.update.execute(
+      (path: 'users/u1/tasks/t1', model: Task(id: 't1', title: 'X')),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.update.errors.value?.error, isA<StateError>());
+
+    // patch
+    repo.patch.execute(
+      (path: 'users/u1/tasks/t1', data: {'title': 'X'}),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.patch.errors.value?.error, isA<StateError>());
+
+    // delete
+    repo.delete.execute('users/u1/tasks/t1');
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.delete.errors.value?.error, isA<StateError>());
+
+    repo.dispose();
+  });
+
   test('resetPages resets to first page', () async {
     final fs = FakeFirebaseFirestore();
     await _seed(fs);
