@@ -374,7 +374,7 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
       } else if (doc.data() != null) {
         final data = Map<String, dynamic>.from(doc.data()!)
           ..['id'] = doc.id
-          ..['parentId'] = doc.reference.parent.parent?.id;
+          ..['parentId'] = parentIdOf(doc.reference);
         _modelCache[path] = _fromJson(data);
       }
     }
@@ -391,7 +391,7 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
       } else {
         final data = Map<String, dynamic>.from(doc.data())
           ..['id'] = doc.id
-          ..['parentId'] = doc.reference.parent.parent?.id;
+          ..['parentId'] = parentIdOf(doc.reference);
         final m = _fromJson(data);
         _modelCache[path] = m;
         list.add(m);

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.1
+
+### Fixed
+- **Web compatibility**: `parentId` injection no longer crashes on web.
+  `cloud_firestore_web` throws an Expando error when calling `.parent` on a
+  top-level `CollectionReference` (where the parent is `null`). The new
+  `parentIdOf()` helper wraps the call in a try-catch, returning `null` for
+  top-level collections.
+
 ## 1.3.0
 
 ### Added

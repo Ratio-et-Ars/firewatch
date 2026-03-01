@@ -1,4 +1,21 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+
+/// Safely extracts the parent document ID for a Firestore document reference.
+///
+/// For subcollection docs (e.g. `apiaries/{id}/hives/{hiveId}`), returns the
+/// parent document ID (`{id}`). For top-level collection docs, returns `null`.
+///
+/// The `cloud_firestore_web` implementation throws when calling `.parent` on a
+/// top-level `CollectionReference` (Expando-on-null error), so this helper
+/// wraps the call in a try-catch.
+String? parentIdOf(DocumentReference ref) {
+  try {
+    return ref.parent.parent?.id;
+  } catch (_) {
+    return null;
+  }
+}
 
 /// A minimal contract for Firestore-backed entities.
 ///

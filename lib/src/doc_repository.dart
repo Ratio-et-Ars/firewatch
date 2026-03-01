@@ -128,7 +128,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
       if (cacheSnap.exists && cacheSnap.data() != null) {
         final data = Map<String, dynamic>.from(cacheSnap.data()!)
           ..['id'] = cacheSnap.id
-          ..['parentId'] = cacheSnap.reference.parent.parent?.id;
+          ..['parentId'] = parentIdOf(cacheSnap.reference);
         _lastData = data;
         value = _fromJson(data);
         isLoading.value = false; // we have something useful already
@@ -156,7 +156,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
 
           final next = Map<String, dynamic>.from(snap.data()!)
             ..['id'] = snap.id
-            ..['parentId'] = snap.reference.parent.parent?.id;
+            ..['parentId'] = parentIdOf(snap.reference);
 
           if (!mapEquals(_lastData, next)) {
             _lastData = next;
@@ -177,7 +177,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
       if (snap.exists && snap.data() != null) {
         final data = Map<String, dynamic>.from(snap.data()!)
           ..['id'] = snap.id
-          ..['parentId'] = snap.reference.parent.parent?.id;
+          ..['parentId'] = parentIdOf(snap.reference);
         _lastData = data;
         value = _fromJson(data);
       }

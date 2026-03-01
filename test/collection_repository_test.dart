@@ -693,6 +693,34 @@ void main() {
     repo.dispose();
   });
 
+  test('parentId is null for top-level collection documents', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    // Top-level collection (no parent document)
+    final col = fs.collection('items');
+    await col.doc('a').set({'n': 1});
+    await col.doc('b').set({'n': 2});
+
+    final repo = FirestoreCollectionRepository<ItemWithParent>(
+      firestore: fs,
+      fromJson: ItemWithParent.fromJson,
+      colRefBuilder: (f, uid) => f.collection('items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 2);
+    for (final item in repo.value) {
+      expect(item.parentId, isNull);
+    }
+
+    repo.dispose();
+  });
+
   test('CRUD commands error when auth-gated and signed out', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>(null);

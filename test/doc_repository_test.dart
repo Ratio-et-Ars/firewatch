@@ -27,6 +27,35 @@ class _ErrorDocRef implements DocumentReference<Map<String, dynamic>> {
       throw UnimplementedError('${invocation.memberName}');
 }
 
+// ignore: subtype_of_sealed_class
+/// Simulates the cloud_firestore_web bug where calling .parent on a top-level
+/// CollectionReference throws an Expando error instead of returning null.
+class _ThrowingParentCollectionRef
+    implements CollectionReference<Map<String, dynamic>> {
+  @override
+  DocumentReference<Map<String, dynamic>>? get parent =>
+      throw ArgumentError('Expandos are not allowed on strings, numbers, '
+          'booleans, records, or null');
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName}');
+}
+
+// ignore: subtype_of_sealed_class
+/// A DocumentReference whose .parent returns a [_ThrowingParentCollectionRef],
+/// reproducing the web crash path: doc.reference.parent.parent → throws.
+class _ThrowingParentDocRef
+    implements DocumentReference<Map<String, dynamic>> {
+  @override
+  CollectionReference<Map<String, dynamic>> get parent =>
+      _ThrowingParentCollectionRef();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName}');
+}
+
 class Foo implements JsonModel {
   @override
   final String id;
@@ -400,6 +429,38 @@ void main() {
     expect(repo.value?.parentId, 'u1');
 
     repo.dispose();
+  });
+
+  test('parentId is null for top-level collection document', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    // Top-level document (no parent document above the collection)
+    await fs.doc('profiles/u1').set({'name': 'Alice'});
+
+    final repo = FirestoreDocRepository<FooWithParent>(
+      firestore: fs,
+      fromJson: FooWithParent.fromJson,
+      docRefBuilder: (f, uid) => f.doc('profiles/$uid'),
+      authUid: authUid,
+      subscribe: true,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value?.id, 'u1');
+    expect(repo.value?.name, 'Alice');
+    expect(repo.value?.parentId, isNull);
+
+    repo.dispose();
+  });
+
+  // Regression: cloud_firestore_web throws an Expando error when calling
+  // .parent on a top-level CollectionReference (parent is null). This test
+  // simulates that by using a DocumentReference whose .parent.parent throws.
+  test('parentIdOf returns null when .parent throws (web compat)', () {
+    final ref = _ThrowingParentDocRef();
+    expect(parentIdOf(ref), isNull);
   });
 
   test('onError callback sets isLoading false on stream error', () async {
