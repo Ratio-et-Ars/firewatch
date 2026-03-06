@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
-  <meta name="description" content="API docs for the dispose method from the FirestoreCollectionRepository class, for the Dart programming language.">
-  <title>dispose method - FirestoreCollectionRepository class - firewatch library - Dart API</title>
+  <meta name="description" content="API docs for the batchPatch property from the FirestoreCollectionRepository class, for the Dart programming language.">
+  <title>batchPatch property - FirestoreCollectionRepository class - firewatch library - Dart API</title>
 
 
   
@@ -27,9 +27,9 @@
     <li><a href="../../index.html">firewatch</a></li>
     <li><a href="../../firewatch/">firewatch.dart</a></li>
     <li><a href="../../firewatch/FirestoreCollectionRepository-class.html">FirestoreCollectionRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
-    <li class="self-crumb">dispose method</li>
+    <li class="self-crumb">batchPatch property</li>
   </ol>
-  <div class="self-name">dispose</div>
+  <div class="self-name">batchPatch</div>
   <form class="search navbar-right" role="search">
     <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
   </form>
@@ -49,72 +49,47 @@
     data-above-sidebar="firewatch&#47;FirestoreCollectionRepository-class-sidebar.html"
     data-below-sidebar="">
     <div>
-<h1><span class="kind-method">dispose</span> method 
+<h1><span class="kind-property">batchPatch</span> property 
 </h1></div>
 
-    <section class="multi-line-signature">
-      
-  <div>
-    <ol class="annotation-list">
-        <li>@<a href="https://api.flutter.dev/flutter/dart-core/override-constant.html">override</a></li>
-    </ol>
-  </div>
-<span class="returntype">void</span>
-<span class="name ">dispose</span>(<wbr>)
-
-      <div class="features"><span class="feature">override</span></div>
-
-    </section>
     
+      <section class="multi-line-signature">
+        
+        <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../firewatch/Patch.html">Patch</a></span>&gt;</span></span>, <span class="type-parameter">void</span>&gt;</span>
+        <span class="name ">batchPatch</span>
+        <div class="features"><span class="feature">late</span><span class="feature">final</span></div>
+
+      </section>
+      
 <section class="desc markdown">
-  <p>Discards any resources used by the object. After this is called, the
-object is not in a usable state and should be discarded (calls to
-<a href="https://api.flutter.dev/flutter/foundation/ChangeNotifier/addListener.html">addListener</a> will throw after the object is disposed).</p>
-<p>This method should only be called by the object's owner.</p>
-<p>This method does not notify listeners, and clears the listener list once
-it is called. Consumers of this class must decide on whether to notify
-listeners or not immediately before disposal.</p>
+  <p>Partially updates multiple documents in a single batched write.</p>
+<p>Each <a href="../../firewatch/Patch.html">Patch</a> contains a document <code>id</code> and a <code>data</code> map of fields
+to update. Only the specified fields are modified; other fields are
+untouched. Matches the behaviour of the single-item <a href="../../firewatch/FirestoreCollectionRepository/patch.html">patch</a> command.</p>
+<p>This is a <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a>, so it exposes <code>isRunning</code>, <code>errors</code>, and can be
+awaited via <code>runAsync</code>. Lists exceeding <a href="../../firewatch/FirestoreCollectionRepository/batchLimit-constant.html">batchLimit</a> (500) are
+automatically split into sequential batches.</p>
+<p>Example:</p>
+<pre class="language-dart"><code class="language-dart">await repo.batchPatch.runAsync([
+  (id: 'u1', data: {'name': 'Alice'}),
+  (id: 'u2', data: {'name': 'Bob'}),
+]);
+</code></pre>
 </section>
 
-
-    
+      
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">@override
-void dispose() {
-  _limit.removeListener(_resizeWindow);
-  _cancelSubAsync();
-  _authUid?.removeListener(_triggerRebuild);
-  _queryNotifier.removeListener(_triggerRebuild);
-  for (final d in _deps) {
-    d.removeListener(_triggerRebuild);
-  }
-  add.dispose();
-  set.dispose();
-  patch.dispose();
-  update.dispose();
-  delete.dispose();
-  batchAdd.dispose();
-  batchSet.dispose();
-  batchPatch.dispose();
-  batchUpdate.dispose();
-  batchDelete.dispose();
-  _queryNotifier.dispose();
-  isLoading.dispose();
-  hasInitialized.dispose();
-  for (final n in _itemNotifiers.values) {
-    n.dispose();
-  }
-  _limit.dispose();
-  hasMore.dispose();
-  super.dispose();
-}</code></pre>
+  <pre class="language-dart"><code class="language-dart">late final batchPatch = Command.createAsyncNoResult&lt;List&lt;Patch&gt;&gt;(
+  (patches) =&gt; _runBatched(patches, (batch, col, p) =&gt; batch.update(col.doc(p.id), p.data)),
+);</code></pre>
 </section>
 
 
-  </div> <!-- /.main-content -->
-  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
-    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+    
+</div> <!-- /.main-content -->
+<div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+  <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
 <header id="header-search-sidebar" class="hidden-l">
   <form class="search-sidebar" role="search">
     <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
@@ -124,13 +99,13 @@ void dispose() {
     <li><a href="../../index.html">firewatch</a></li>
     <li><a href="../../firewatch/">firewatch</a></li>
     <li><a href="../../firewatch/FirestoreCollectionRepository-class.html">FirestoreCollectionRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
-    <li class="self-crumb">dispose method</li>
+    <li class="self-crumb">batchPatch property</li>
 </ol>
 
-    <h5>FirestoreCollectionRepository class</h5>
-    <div id="dartdoc-sidebar-left-content"></div>
-  </div><!--/.sidebar-offcanvas-->
-  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+  <h5>FirestoreCollectionRepository class</h5>
+  <div id="dartdoc-sidebar-left-content"></div>
+</div><!--/.sidebar-offcanvas-->
+<div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
 </div><!--/.sidebar-offcanvas-->
 </main>
 <footer>
