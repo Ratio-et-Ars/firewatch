@@ -77,7 +77,32 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   /// Use this to drive spinners or progress indicators in the UI.
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(true);
 
+  /// Flips to `true` after the first successful load (from cache or server)
+  /// and never reverts. Use this to distinguish "never loaded" from
+  /// "loaded but value is null (document doesn't exist)".
+  final ValueNotifier<bool> hasInitialized = ValueNotifier<bool>(false);
+
+  final Completer<T?> _readyCompleter = Completer<T?>();
+
+  /// A [Future] that completes with the first loaded value (which may be
+  /// `null` if the document does not exist). Useful for one-time await
+  /// in services that need the data before proceeding.
+  ///
+  /// ```dart
+  /// final subscription = repo.value ?? await repo.ready;
+  /// ```
+  Future<T?> get ready => _readyCompleter.future;
+
   String? get _currentUserUid => _authUid?.value;
+
+  void _markInitialized() {
+    if (!hasInitialized.value) {
+      hasInitialized.value = true;
+    }
+    if (!_readyCompleter.isCompleted) {
+      _readyCompleter.complete(value);
+    }
+  }
 
   /// Whether this repo requires authentication. True when [authUid] was
   /// provided; false for public/unauthenticated collections.
@@ -116,6 +141,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
       value = null;
       _lastData = null;
       isLoading.value = false;
+      _markInitialized();
       return;
     }
 
@@ -132,6 +158,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
         _lastData = data;
         value = _fromJson(data);
         isLoading.value = false; // we have something useful already
+        _markInitialized();
       }
     } catch (_) {
       if (epoch != _epoch) return; // stale
@@ -150,7 +177,10 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
               _lastData = null;
               value = null;
             }
-            if (!snap.metadata.hasPendingWrites) isLoading.value = false;
+            if (!snap.metadata.hasPendingWrites) {
+              isLoading.value = false;
+              _markInitialized();
+            }
             return;
           }
 
@@ -163,11 +193,15 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
             value = _fromJson(next);
           }
 
-          if (!snap.metadata.hasPendingWrites) isLoading.value = false;
+          if (!snap.metadata.hasPendingWrites) {
+            isLoading.value = false;
+            _markInitialized();
+          }
         },
         onError: (_) {
           if (epoch != _epoch) return;
           isLoading.value = false;
+          _markInitialized();
         },
       );
     } else {
@@ -182,6 +216,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
         value = _fromJson(data);
       }
       isLoading.value = false;
+      _markInitialized();
     }
   }
 
@@ -222,6 +257,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   // ── lifecycle ─────────────────────────────────────────────────────────────
   @override
   void dispose() {
+    ++_epoch; // prevent in-flight async ops from touching disposed notifier
     _cancelSubAsync();
     _authUid?.removeListener(_onAuth);
     write.dispose();
@@ -229,6 +265,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
     patch.dispose();
     delete.dispose();
     isLoading.dispose();
+    hasInitialized.dispose();
     super.dispose();
   }
 }
