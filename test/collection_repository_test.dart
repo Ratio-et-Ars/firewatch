@@ -721,6 +721,342 @@ void main() {
     repo.dispose();
   });
 
+  // ── batchDelete ──────────────────────────────────────────────────────────
+
+  test('batchDelete removes multiple documents at once', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    final id1 = (await col.add({'n': 1})).id;
+    final id2 = (await col.add({'n': 2})).id;
+    final id3 = (await col.add({'n': 3})).id;
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 3);
+
+    await repo.batchDelete([id1, id3]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 1);
+    expect(repo.value.first.id, id2);
+
+    repo.dispose();
+  });
+
+  test('batchDelete with empty list is a no-op', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    await col.add({'n': 1});
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 1);
+
+    await repo.batchDelete([]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 1);
+
+    repo.dispose();
+  });
+
+  test('batchDelete throws when auth-gated and signed out', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(() => repo.batchDelete(['x']), throwsStateError);
+
+    repo.dispose();
+  });
+
+  // ── batchAdd ────────────────────────────────────────────────────────────
+
+  test('batchAdd creates multiple documents', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value, isEmpty);
+
+    await repo.batchAdd([{'n': 10}, {'n': 20}, {'n': 30}]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 3);
+    final ns = repo.value.map((e) => e.n).toList()..sort();
+    expect(ns, [10, 20, 30]);
+
+    repo.dispose();
+  });
+
+  test('batchAdd with empty list is a no-op', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    await repo.batchAdd([]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value, isEmpty);
+
+    repo.dispose();
+  });
+
+  test('batchAdd throws when auth-gated and signed out', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(() => repo.batchAdd([{'n': 1}]), throwsStateError);
+
+    repo.dispose();
+  });
+
+  // ── batchSet ────────────────────────────────────────────────────────────
+
+  test('batchSet creates and merges documents', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Create via batchSet
+    await repo.batchSet([
+      Item(id: 'a', n: 1),
+      Item(id: 'b', n: 2),
+    ]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 2);
+
+    // Overwrite one
+    await repo.batchSet([Item(id: 'a', n: 99)]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final a = repo.value.firstWhere((e) => e.id == 'a');
+    expect(a.n, 99);
+    expect(repo.value.length, 2);
+
+    repo.dispose();
+  });
+
+  test('batchSet with empty list is a no-op', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    await repo.batchSet(<Item>[]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value, isEmpty);
+
+    repo.dispose();
+  });
+
+  // ── batchPatch ──────────────────────────────────────────────────────────
+
+  test('batchPatch partially updates multiple documents', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    await col.doc('a').set({'n': 1});
+    await col.doc('b').set({'n': 2});
+    await col.doc('c').set({'n': 3});
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 3);
+
+    await repo.batchPatch([
+      (id: 'a', data: {'n': 10}),
+      (id: 'c', data: {'n': 30}),
+    ]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final a = repo.value.firstWhere((e) => e.id == 'a');
+    final b = repo.value.firstWhere((e) => e.id == 'b');
+    final c = repo.value.firstWhere((e) => e.id == 'c');
+    expect(a.n, 10);
+    expect(b.n, 2); // unchanged
+    expect(c.n, 30);
+
+    repo.dispose();
+  });
+
+  test('batchPatch with empty list is a no-op', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    await col.doc('a').set({'n': 1});
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    await repo.batchPatch([]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.first.n, 1);
+
+    repo.dispose();
+  });
+
+  test('batchPatch throws when auth-gated and signed out', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(
+      () => repo.batchPatch([(id: 'x', data: {'n': 1})]),
+      throwsStateError,
+    );
+
+    repo.dispose();
+  });
+
+  // ── batch operations on public collections ──────────────────────────────
+
+  test('batch operations work without authUid', () async {
+    final fs = FakeFirebaseFirestore();
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('publicItems'),
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // batchAdd
+    await repo.batchAdd([{'n': 1}, {'n': 2}]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+
+    // batchPatch
+    final ids = repo.value.map((e) => e.id).toList();
+    await repo.batchPatch([
+      (id: ids[0], data: {'n': 10}),
+      (id: ids[1], data: {'n': 20}),
+    ]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    final ns = repo.value.map((e) => e.n).toList()..sort();
+    expect(ns, [10, 20]);
+
+    // batchDelete
+    await repo.batchDelete(ids);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value, isEmpty);
+
+    repo.dispose();
+  });
+
   test('CRUD commands error when auth-gated and signed out', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>(null);
