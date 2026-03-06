@@ -744,7 +744,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.value.length, 3);
 
-    await repo.batchDelete([id1, id3]);
+    await repo.batchDelete.runAsync([id1, id3]);
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.value.length, 1);
@@ -772,7 +772,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.value.length, 1);
 
-    await repo.batchDelete([]);
+    await repo.batchDelete.runAsync([]);
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.value.length, 1);
@@ -780,7 +780,7 @@ void main() {
     repo.dispose();
   });
 
-  test('batchDelete throws when auth-gated and signed out', () async {
+  test('batchDelete errors when auth-gated and signed out', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>(null);
 
@@ -795,7 +795,10 @@ void main() {
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
-    expect(() => repo.batchDelete(['x']), throwsStateError);
+    repo.batchDelete.errors.addListener(() {});
+    repo.batchDelete.run(['x']);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.batchDelete.errors.value?.error, isA<StateError>());
 
     repo.dispose();
   });
@@ -818,7 +821,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.value, isEmpty);
 
-    await repo.batchAdd([{'n': 10}, {'n': 20}, {'n': 30}]);
+    await repo.batchAdd.runAsync([{'n': 10}, {'n': 20}, {'n': 30}]);
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.value.length, 3);
@@ -843,7 +846,7 @@ void main() {
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
-    await repo.batchAdd([]);
+    await repo.batchAdd.runAsync([]);
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.value, isEmpty);
@@ -851,7 +854,7 @@ void main() {
     repo.dispose();
   });
 
-  test('batchAdd throws when auth-gated and signed out', () async {
+  test('batchAdd errors when auth-gated and signed out', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>(null);
 
@@ -866,7 +869,10 @@ void main() {
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
-    expect(() => repo.batchAdd([{'n': 1}]), throwsStateError);
+    repo.batchAdd.errors.addListener(() {});
+    repo.batchAdd.run([{'n': 1}]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.batchAdd.errors.value?.error, isA<StateError>());
 
     repo.dispose();
   });
@@ -889,7 +895,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     // Create via batchSet
-    await repo.batchSet([
+    await repo.batchSet.runAsync([
       Item(id: 'a', n: 1),
       Item(id: 'b', n: 2),
     ]);
@@ -898,7 +904,7 @@ void main() {
     expect(repo.value.length, 2);
 
     // Overwrite one
-    await repo.batchSet([Item(id: 'a', n: 99)]);
+    await repo.batchSet.runAsync([Item(id: 'a', n: 99)]);
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     final a = repo.value.firstWhere((e) => e.id == 'a');
@@ -923,7 +929,7 @@ void main() {
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
-    await repo.batchSet(<Item>[]);
+    await repo.batchSet.runAsync(<Item>[]);
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.value, isEmpty);
@@ -954,7 +960,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.value.length, 3);
 
-    await repo.batchPatch([
+    await repo.batchPatch.runAsync([
       (id: 'a', data: {'n': 10}),
       (id: 'c', data: {'n': 30}),
     ]);
@@ -988,7 +994,7 @@ void main() {
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
-    await repo.batchPatch([]);
+    await repo.batchPatch.runAsync([]);
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.value.first.n, 1);
@@ -996,7 +1002,7 @@ void main() {
     repo.dispose();
   });
 
-  test('batchPatch throws when auth-gated and signed out', () async {
+  test('batchPatch errors when auth-gated and signed out', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>(null);
 
@@ -1011,10 +1017,10 @@ void main() {
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
-    expect(
-      () => repo.batchPatch([(id: 'x', data: {'n': 1})]),
-      throwsStateError,
-    );
+    repo.batchPatch.errors.addListener(() {});
+    repo.batchPatch.run([(id: 'x', data: {'n': 1})]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.batchPatch.errors.value?.error, isA<StateError>());
 
     repo.dispose();
   });
@@ -1040,7 +1046,7 @@ void main() {
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
-    await repo.batchUpdate([
+    await repo.batchUpdate.runAsync([
       Item(id: 'a', n: 100),
       Item(id: 'b', n: 200),
     ]);
@@ -1072,7 +1078,7 @@ void main() {
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
-    await repo.batchUpdate(<Item>[]);
+    await repo.batchUpdate.runAsync(<Item>[]);
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.value.first.n, 1);
@@ -1108,7 +1114,7 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.value.length, count);
 
-    await repo.batchDelete(ids);
+    await repo.batchDelete.runAsync(ids);
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.value, isEmpty);
@@ -1134,7 +1140,7 @@ void main() {
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
-    await repo.batchAdd(items);
+    await repo.batchAdd.runAsync(items);
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     expect(repo.value.length, count);
@@ -1158,13 +1164,13 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
 
     // batchAdd
-    await repo.batchAdd([{'n': 1}, {'n': 2}]);
+    await repo.batchAdd.runAsync([{'n': 1}, {'n': 2}]);
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.value.length, 2);
 
     // batchPatch
     final ids = repo.value.map((e) => e.id).toList();
-    await repo.batchPatch([
+    await repo.batchPatch.runAsync([
       (id: ids[0], data: {'n': 10}),
       (id: ids[1], data: {'n': 20}),
     ]);
@@ -1173,7 +1179,7 @@ void main() {
     expect(ns, [10, 20]);
 
     // batchDelete
-    await repo.batchDelete(ids);
+    await repo.batchDelete.runAsync(ids);
     await Future<void>.delayed(const Duration(milliseconds: 10));
     expect(repo.value, isEmpty);
 
