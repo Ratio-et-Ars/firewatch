@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.4.0
+
+### Added
+- **`hasInitialized`** (`ValueNotifier<bool>`) on `FirestoreDocRepository` —
+  flips to `true` after the first successful load (from cache or server) and
+  never reverts. Mirrors the existing property on `FirestoreCollectionRepository`.
+- **`ready`** (`Future<T?>`) on `FirestoreDocRepository` — completes with the
+  first loaded value (which may be `null` if the document doesn't exist). Useful
+  for one-time `await` in services that need data before proceeding.
+
+### Fixed
+- `dispose()` now increments the epoch counter to prevent in-flight async
+  operations from writing to a disposed notifier.
+
 ## 1.3.1
 
 ### Fixed

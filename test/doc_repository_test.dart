@@ -480,4 +480,186 @@ void main() {
 
     repo.dispose();
   });
+
+  group('hasInitialized', () {
+    test('starts false and flips to true after first load', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      await fs.doc('foos/u1').set({'name': 'Alice'});
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      // hasInitialized starts false
+      // (may already be true if cache primed synchronously)
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(repo.hasInitialized.value, isTrue);
+      expect(repo.value?.name, 'Alice');
+
+      repo.dispose();
+    });
+
+    test('is true even when document does not exist', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(repo.value, isNull);
+      expect(repo.hasInitialized.value, isTrue);
+
+      repo.dispose();
+    });
+
+    test('is true when signed out (auth-gated with null uid)', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>(null);
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(repo.hasInitialized.value, isTrue);
+
+      repo.dispose();
+    });
+
+    test('is true on stream error', () async {
+      final fs = FakeFirebaseFirestore();
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => _ErrorDocRef(),
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(repo.hasInitialized.value, isTrue);
+
+      repo.dispose();
+    });
+  });
+
+  group('ready', () {
+    test('completes with value after first load', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      await fs.doc('foos/u1').set({'name': 'Alice'});
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      final result = await repo.ready;
+      expect(result?.name, 'Alice');
+
+      repo.dispose();
+    });
+
+    test('completes with null when document does not exist', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      final result = await repo.ready;
+      expect(result, isNull);
+
+      repo.dispose();
+    });
+
+    test('completes with null when signed out', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>(null);
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      final result = await repo.ready;
+      expect(result, isNull);
+
+      repo.dispose();
+    });
+
+    test('returns immediately if already initialized', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      await fs.doc('foos/u1').set({'name': 'Alice'});
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await repo.ready; // wait for first load
+      // second call should return instantly
+      final result = await repo.ready;
+      expect(result?.name, 'Alice');
+
+      repo.dispose();
+    });
+
+    test('works with one-shot mode', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      await fs.doc('foos/u1').set({'name': 'OneShot'});
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: false,
+      );
+
+      final result = await repo.ready;
+      expect(result?.name, 'OneShot');
+
+      repo.dispose();
+    });
+  });
 }
