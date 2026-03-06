@@ -4,7 +4,9 @@
 /// - `FirestoreCollectionRepository` for managing live queries and pagination
 /// - `FirestoreDocRepository` for document-scoped state
 /// - Command wrappers (`add`, `set`, `patch`, `update`, `delete`) for
-///   CRUD operations
+///   single-item CRUD operations
+/// - Batch methods (`batchAdd`, `batchSet`, `batchPatch`, `batchUpdate`,
+///   `batchDelete`) for atomic multi-document writes via `WriteBatch`
 ///
 /// Designed to integrate with ValueNotifier and Listenable patterns for
 /// Flutter apps.
