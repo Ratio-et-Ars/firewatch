@@ -1019,6 +1019,129 @@ void main() {
     repo.dispose();
   });
 
+  // ── batchUpdate ─────────────────────────────────────────────────────────
+
+  test('batchUpdate fully replaces multiple documents', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    await col.doc('a').set({'n': 1});
+    await col.doc('b').set({'n': 2});
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    await repo.batchUpdate([
+      Item(id: 'a', n: 100),
+      Item(id: 'b', n: 200),
+    ]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final a = repo.value.firstWhere((e) => e.id == 'a');
+    final b = repo.value.firstWhere((e) => e.id == 'b');
+    expect(a.n, 100);
+    expect(b.n, 200);
+
+    repo.dispose();
+  });
+
+  test('batchUpdate with empty list is a no-op', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    await col.doc('a').set({'n': 1});
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    await repo.batchUpdate(<Item>[]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.first.n, 1);
+
+    repo.dispose();
+  });
+
+  // ── chunking boundary ──────────────────────────────────────────────────
+
+  test('batchDelete chunks correctly at the batch limit boundary', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    // Seed more than batchLimit docs to exercise chunking.
+    // Use batchLimit + 3 to test the partial final chunk.
+    final count = FirestoreCollectionRepository.batchLimit + 3;
+    final col = fs.collection('users/u1/items');
+    final ids = <String>[];
+    for (var i = 0; i < count; i++) {
+      final ref = await col.add({'n': i});
+      ids.add(ref.id);
+    }
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      paginate: false,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, count);
+
+    await repo.batchDelete(ids);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value, isEmpty);
+
+    repo.dispose();
+  });
+
+  test('batchAdd chunks correctly at the batch limit boundary', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final count = FirestoreCollectionRepository.batchLimit + 5;
+    final items = List.generate(count, (i) => {'n': i});
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      paginate: false,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    await repo.batchAdd(items);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, count);
+
+    repo.dispose();
+  });
+
   // ── batch operations on public collections ──────────────────────────────
 
   test('batch operations work without authUid', () async {
