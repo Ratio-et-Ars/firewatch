@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
-  <meta name="description" content="API docs for the notifierFor method from the FirestoreCollectionGroupRepository class, for the Dart programming language.">
-  <title>notifierFor method - FirestoreCollectionGroupRepository class - firewatch library - Dart API</title>
+  <meta name="description" content="API docs for the ready property from the FirestoreDocRepository class, for the Dart programming language.">
+  <title>ready property - FirestoreDocRepository class - firewatch library - Dart API</title>
 
 
   
@@ -26,10 +26,10 @@
   <ol class="breadcrumbs gt-separated dark hidden-xs">
     <li><a href="../../index.html">firewatch</a></li>
     <li><a href="../../firewatch/">firewatch.dart</a></li>
-    <li><a href="../../firewatch/FirestoreCollectionGroupRepository-class.html">FirestoreCollectionGroupRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
-    <li class="self-crumb">notifierFor method</li>
+    <li><a href="../../firewatch/FirestoreDocRepository-class.html">FirestoreDocRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
+    <li class="self-crumb">ready property</li>
   </ol>
-  <div class="self-name">notifierFor</div>
+  <div class="self-name">ready</div>
   <form class="search navbar-right" role="search">
     <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
   </form>
@@ -46,39 +46,46 @@
 <div
     id="dartdoc-main-content"
     class="main-content"
-    data-above-sidebar="firewatch&#47;FirestoreCollectionGroupRepository-class-sidebar.html"
+    data-above-sidebar="firewatch&#47;FirestoreDocRepository-class-sidebar.html"
     data-below-sidebar="">
     <div>
-<h1><span class="kind-method">notifierFor</span> method 
+<h1><span class="kind-property">ready</span> property 
 </h1></div>
 
+    
+
+    
+        
+  <section id="getter">
     <section class="multi-line-signature">
       
-<span class="returntype"><a href="https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html">ValueNotifier</a><span class="signature">&lt;<wbr><span class="type-parameter">T?</span>&gt;</span></span>
-<span class="name ">notifierFor</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="notifierFor-param-docPath"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">docPath</span></span></li>
-</ol>)
-
+      <span class="returntype"><a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">T?</span>&gt;</span></span>
+      get
+      <span class="name ">ready</span>
       
 
     </section>
     
 <section class="desc markdown">
-  <p>Per-item notifier keyed by full document path (kept in sync from the
-collection group results).</p>
+  <p>A <a href="https://api.flutter.dev/flutter/flutter_test/Future-class.html">Future</a> that completes with the first loaded value (which may be
+<code>null</code> if the document does not exist). Useful for one-time await
+in services that need the data before proceeding.</p>
+<pre class="language-dart"><code class="language-dart">final subscription = repo.value ?? await repo.ready;
+</code></pre>
 </section>
-
 
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">ValueNotifier&lt;T?&gt; notifierFor(String docPath) =&gt;
-    _itemNotifiers.putIfAbsent(docPath, () =&gt; ValueNotifier&lt;T?&gt;(null));</code></pre>
+  <pre class="language-dart"><code class="language-dart">Future&lt;T?&gt; get ready =&gt; _readyCompleter.future;</code></pre>
 </section>
 
+  </section>
 
-  </div> <!-- /.main-content -->
-  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
-    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+
+</div> <!-- /.main-content -->
+<div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+  <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
 <header id="header-search-sidebar" class="hidden-l">
   <form class="search-sidebar" role="search">
     <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
@@ -87,14 +94,14 @@ collection group results).</p>
 <ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
     <li><a href="../../index.html">firewatch</a></li>
     <li><a href="../../firewatch/">firewatch</a></li>
-    <li><a href="../../firewatch/FirestoreCollectionGroupRepository-class.html">FirestoreCollectionGroupRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
-    <li class="self-crumb">notifierFor method</li>
+    <li><a href="../../firewatch/FirestoreDocRepository-class.html">FirestoreDocRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
+    <li class="self-crumb">ready property</li>
 </ol>
 
-    <h5>FirestoreCollectionGroupRepository class</h5>
-    <div id="dartdoc-sidebar-left-content"></div>
-  </div><!--/.sidebar-offcanvas-->
-  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+  <h5>FirestoreDocRepository class</h5>
+  <div id="dartdoc-sidebar-left-content"></div>
+</div><!--/.sidebar-offcanvas-->
+<div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
 </div><!--/.sidebar-offcanvas-->
 </main>
 <footer>

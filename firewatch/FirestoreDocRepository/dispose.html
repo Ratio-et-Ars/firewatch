@@ -82,6 +82,7 @@ listeners or not immediately before disposal.</p>
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">@override
 void dispose() {
+  ++_epoch; &#47;&#47; prevent in-flight async ops from touching disposed notifier
   _cancelSubAsync();
   _authUid?.removeListener(_onAuth);
   write.dispose();
@@ -89,6 +90,7 @@ void dispose() {
   patch.dispose();
   delete.dispose();
   isLoading.dispose();
+  hasInitialized.dispose();
   super.dispose();
 }</code></pre>
 </section>
@@ -118,7 +120,7 @@ void dispose() {
 <footer>
   <span class="no-break">
     firewatch
-      1.3.1
+      1.4.0
   </span>
   
 </footer>
