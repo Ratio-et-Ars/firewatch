@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.0
+
+### Added
+- **Batch CRUD operations** on `FirestoreCollectionRepository`:
+  `batchAdd`, `batchSet`, `batchPatch`, `batchUpdate`, `batchDelete`.
+  All are `Command` instances (not plain Futures), so consumers can watch
+  `isRunning`, listen to `errors`, and use the full Command lifecycle —
+  consistent with single-item CRUD commands.
+- Automatically chunks operations at the Firestore 500-operation batch limit.
+- Auth-gated: batch commands route a `StateError` through `.errors` when
+  the UID is null, matching single-item command behavior.
+
 ## 1.4.0
 
 ### Added
