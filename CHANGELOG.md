@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.1
+
+### Fixed
+- **`ready` returns stale null after `authUid` change** (#13):
+  `_readyCompleter` was never reset, so `ready` cached its first result
+  forever. Now `hasInitialized` resets to `false` and a fresh `Completer`
+  is created on every auth transition, so callers re-await fresh data.
+
 ## 1.5.0
 
 ### Added
