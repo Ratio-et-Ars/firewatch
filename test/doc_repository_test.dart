@@ -642,6 +642,39 @@ void main() {
       repo.dispose();
     });
 
+    test('re-waits after authUid change (regression #13)', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>(null);
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      // Initially signed out — ready completes with null
+      final firstReady = await repo.ready;
+      expect(firstReady, isNull);
+      expect(repo.hasInitialized.value, isTrue);
+
+      // Sign in — UID changes, data arrives
+      await fs.doc('foos/u1').set({'name': 'Alice'});
+      authUid.value = 'u1';
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      // hasInitialized should flip back to true after re-load
+      expect(repo.hasInitialized.value, isTrue);
+      expect(repo.value?.name, 'Alice');
+
+      // ready should return the NEW value, not stale null
+      final secondReady = await repo.ready;
+      expect(secondReady?.name, 'Alice');
+
+      repo.dispose();
+    });
+
     test('works with one-shot mode', () async {
       final fs = FakeFirebaseFirestore();
       final authUid = ValueNotifier<String?>('u1');
