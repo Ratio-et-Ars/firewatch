@@ -82,7 +82,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   /// "loaded but value is null (document doesn't exist)".
   final ValueNotifier<bool> hasInitialized = ValueNotifier<bool>(false);
 
-  final Completer<T?> _readyCompleter = Completer<T?>();
+  Completer<T?> _readyCompleter = Completer<T?>();
 
   /// A [Future] that completes with the first loaded value (which may be
   /// `null` if the document does not exist). Useful for one-time await
@@ -132,6 +132,10 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   Future<void> _swap(String? uid) async {
     final epoch = ++_epoch;
     isLoading.value = true;
+
+    // Reset readiness state so `ready` re-waits for new data.
+    hasInitialized.value = false;
+    _readyCompleter = Completer<T?>();
 
     // Stop previous stream
     _cancelSubAsync();
