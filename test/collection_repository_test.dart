@@ -274,6 +274,35 @@ void main() {
     expect(repo.value, isEmpty);
   });
 
+  test(
+      'collection repo dispose while swap in-flight does not update disposed notifier',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+
+    // Seed data
+    await fs.collection('users/u1/items').doc('a').set({'n': 1});
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    // Sign in triggers an async _swap — dispose before it can complete
+    authUid.value = 'u1';
+    repo.dispose();
+
+    // Let any pending microtasks flush
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    // The in-flight swap must not have populated the disposed notifier.
+    expect(repo.value, isEmpty);
+  });
+
   test('collection repo resets pagination on query change', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>('u1');

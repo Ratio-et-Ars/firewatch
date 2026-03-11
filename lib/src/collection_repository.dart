@@ -576,6 +576,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   // ── lifecycle ─────────────────────────────────────────────────────────────
   @override
   void dispose() {
+    ++_epoch; // prevent in-flight async ops from touching disposed notifiers
     _limit.removeListener(_resizeWindow);
     _cancelSubAsync();
     _authUid?.removeListener(_triggerRebuild);
