@@ -257,6 +257,37 @@ void main() {
     expect(repo.value, isNull);
   });
 
+  test('doc repo dispose while swap in-flight does not update disposed notifier',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    await fs.doc('foos/u1').set({'name': 'User1'});
+    await fs.doc('foos/u2').set({'name': 'User2'});
+
+    final repo = FirestoreDocRepository<Foo>(
+      firestore: fs,
+      fromJson: Foo.fromJson,
+      docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+      authUid: authUid,
+      subscribe: true,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value?.name, 'User1');
+
+    // Trigger a swap (in-flight async) then immediately dispose
+    authUid.value = 'u2';
+    repo.dispose();
+
+    // Let any pending microtasks flush
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    // The repo should still show the old value — the in-flight swap
+    // must not have updated the disposed notifier.
+    expect(repo.value?.name, 'User1');
+  });
+
   test('doc repo handles rapid auth changes without stale data', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>(null);

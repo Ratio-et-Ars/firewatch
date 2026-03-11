@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.2
+
+### Fixed
+- **In-flight async ops update disposed notifier** (#15):
+  `FirestoreCollectionRepository.dispose()` did not increment the epoch
+  counter, so pending cache primes, snapshot callbacks, or one-shot fetches
+  could write to already-disposed `ValueNotifier`s (causing Flutter assertion
+  errors). Now mirrors `FirestoreDocRepository.dispose()` by bumping `_epoch`
+  first.
+
 ## 1.5.1
 
 ### Fixed
