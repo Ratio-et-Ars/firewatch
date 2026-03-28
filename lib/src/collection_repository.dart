@@ -87,6 +87,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
     bool subscribe = true, // realtime vs one-shot
     int pageSize = 25, // default page size
     bool paginate = true,
+    FirewatchErrorHandler? onError,
   }) : _fs = firestore ?? FirebaseFirestore.instance,
        _fromJson = fromJson,
        _colRefBuilder = colRefBuilder,
@@ -97,6 +98,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
        _limit = ValueNotifier<int>(pageSize),
        _pageSize = pageSize,
        _paginate = paginate,
+       _onError = onError,
        super(const []) {
     // Wire listeners (auth + deps + query + limit)
     _authUid?.addListener(_triggerRebuild);
@@ -115,6 +117,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   final T Function(Map<String, dynamic>) _fromJson;
   final ColRefBuilder _colRefBuilder;
   final bool _subscribe;
+  final FirewatchErrorHandler? _onError;
   final List<Listenable> _deps;
 
   final ValueNotifier<QueryMutator?> _queryNotifier;
@@ -460,9 +463,10 @@ class FirestoreCollectionRepository<T extends JsonModel>
             if (epoch != _epoch) return;
             _handleSnap(snap, fromOneShot: false);
           },
-          onError: (_) {
+          onError: (Object error, StackTrace stackTrace) {
             if (epoch != _epoch) return;
             isLoading.value = false;
+            _onError?.call(error, stackTrace);
           },
         );
       } else {
@@ -526,10 +530,11 @@ class FirestoreCollectionRepository<T extends JsonModel>
           if (epoch != _epoch) return;
           _handleSnap(snap, fromOneShot: false);
         },
-        onError: (_) {
+        onError: (Object error, StackTrace stackTrace) {
           if (epoch != _epoch) return;
           hasInitialized.value = true;
           isLoading.value = false;
+          _onError?.call(error, stackTrace);
         },
       );
     } else {
@@ -549,6 +554,9 @@ class FirestoreCollectionRepository<T extends JsonModel>
       final snap = await _queryWith(uid).get();
       if (epoch != _epoch) return;
       _handleSnap(snap, fromOneShot: true);
+    } catch (error, stackTrace) {
+      if (epoch != _epoch) return;
+      _onError?.call(error, stackTrace);
     } finally {
       if (epoch == _epoch) {
         isLoading.value = false;

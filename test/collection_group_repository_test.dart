@@ -796,4 +796,114 @@ void main() {
 
     repo.dispose();
   });
+
+  // ── onError callback ────────────────────────────────────────────────────
+
+  test('onError callback receives stream error from _swap', () async {
+    Object? receivedError;
+    StackTrace? receivedStackTrace;
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: FakeFirebaseFirestore(),
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => _ErrorQuery(),
+      subscribe: true,
+      pageSize: 50,
+      onError: (error, stackTrace) {
+        receivedError = error;
+        receivedStackTrace = stackTrace;
+      },
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(receivedError, isA<Exception>());
+    expect(receivedStackTrace, isNotNull);
+    expect(repo.isLoading.value, isFalse);
+    expect(repo.hasInitialized.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('onError callback receives stream error from _resizeWindow', () async {
+    final fs = FakeFirebaseFirestore();
+    await _seed(fs);
+
+    Object? receivedError;
+    var useError = false;
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) =>
+          useError ? _ErrorQuery() : f.collectionGroup('tasks'),
+      subscribe: true,
+      pageSize: 2,
+      onError: (error, stackTrace) {
+        receivedError = error;
+      },
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+    expect(receivedError, isNull);
+
+    // Switch to error-producing query, then loadMore triggers _resizeWindow
+    useError = true;
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(receivedError, isA<Exception>());
+    expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('onError callback receives one-shot fetch error', () async {
+    Object? receivedError;
+    StackTrace? receivedStackTrace;
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: FakeFirebaseFirestore(),
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => _ErrorQuery(),
+      subscribe: false,
+      pageSize: 50,
+      onError: (error, stackTrace) {
+        receivedError = error;
+        receivedStackTrace = stackTrace;
+      },
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(receivedError, isA<Exception>());
+    expect(receivedStackTrace, isNotNull);
+    expect(repo.isLoading.value, isFalse);
+    expect(repo.hasInitialized.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('onError is not called when no error occurs', () async {
+    final fs = FakeFirebaseFirestore();
+    await _seed(fs);
+
+    var errorCount = 0;
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      subscribe: true,
+      pageSize: 50,
+      onError: (error, stackTrace) => errorCount++,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(errorCount, 0);
+    expect(repo.value.length, 3);
+
+    repo.dispose();
+  });
 }

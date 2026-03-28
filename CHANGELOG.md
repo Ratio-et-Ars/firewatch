@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.0
+
+### Added
+- **`onError` callback** on all three repository constructors
+  (`FirestoreDocRepository`, `FirestoreCollectionRepository`,
+  `FirestoreCollectionGroupRepository`). Called with the error and stack
+  trace when a Firestore snapshot listener or one-shot fetch fails.
+  Optional and non-breaking — when omitted, existing behavior is unchanged.
+- **`FirewatchErrorHandler`** typedef exported from `firewatch.dart` for
+  typing the callback: `void Function(Object error, StackTrace stackTrace)`.
+
 ## 1.6.0
 
 ### Added

@@ -1421,4 +1421,122 @@ void main() {
 
     repo.dispose();
   });
+
+  // ── onError callback ────────────────────────────────────────────────────
+
+  test('onError callback receives stream error from _swap', () async {
+    Object? receivedError;
+    StackTrace? receivedStackTrace;
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: FakeFirebaseFirestore(),
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => _ErrorCollectionRef(),
+      subscribe: true,
+      pageSize: 50,
+      onError: (error, stackTrace) {
+        receivedError = error;
+        receivedStackTrace = stackTrace;
+      },
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(receivedError, isA<Exception>());
+    expect(receivedStackTrace, isNotNull);
+    expect(repo.isLoading.value, isFalse);
+    expect(repo.hasInitialized.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('onError callback receives stream error from _resizeWindow', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    for (var i = 0; i < 3; i++) {
+      await col.add({'n': i});
+    }
+
+    Object? receivedError;
+    var useError = false;
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) =>
+          useError ? _ErrorCollectionRef() : f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 2,
+      onError: (error, stackTrace) {
+        receivedError = error;
+      },
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+    expect(receivedError, isNull);
+
+    // Switch to error-producing ref, then loadMore triggers _resizeWindow
+    useError = true;
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(receivedError, isA<Exception>());
+    expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('onError callback receives one-shot fetch error', () async {
+    Object? receivedError;
+    StackTrace? receivedStackTrace;
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: FakeFirebaseFirestore(),
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => _ErrorCollectionRef(),
+      subscribe: false,
+      pageSize: 50,
+      onError: (error, stackTrace) {
+        receivedError = error;
+        receivedStackTrace = stackTrace;
+      },
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(receivedError, isA<Exception>());
+    expect(receivedStackTrace, isNotNull);
+    expect(repo.isLoading.value, isFalse);
+    expect(repo.hasInitialized.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('onError is not called when no error occurs', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+    await fs.collection('users/u1/items').add({'n': 1});
+
+    var errorCount = 0;
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+      onError: (error, stackTrace) => errorCount++,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(errorCount, 0);
+    expect(repo.value.length, 1);
+
+    repo.dispose();
+  });
 }

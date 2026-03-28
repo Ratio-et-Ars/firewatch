@@ -726,4 +726,78 @@ void main() {
       repo.dispose();
     });
   });
+
+  // ── onError callback ────────────────────────────────────────────────────
+
+  test('onError callback receives stream error', () async {
+    Object? receivedError;
+    StackTrace? receivedStackTrace;
+
+    final repo = FirestoreDocRepository<Foo>(
+      firestore: FakeFirebaseFirestore(),
+      fromJson: Foo.fromJson,
+      docRefBuilder: (f, uid) => _ErrorDocRef(),
+      subscribe: true,
+      onError: (error, stackTrace) {
+        receivedError = error;
+        receivedStackTrace = stackTrace;
+      },
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(receivedError, isA<Exception>());
+    expect(receivedStackTrace, isNotNull);
+    expect(repo.isLoading.value, isFalse);
+    expect(repo.hasInitialized.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('onError callback receives one-shot fetch error', () async {
+    Object? receivedError;
+    StackTrace? receivedStackTrace;
+
+    final repo = FirestoreDocRepository<Foo>(
+      firestore: FakeFirebaseFirestore(),
+      fromJson: Foo.fromJson,
+      docRefBuilder: (f, uid) => _ErrorDocRef(),
+      subscribe: false,
+      onError: (error, stackTrace) {
+        receivedError = error;
+        receivedStackTrace = stackTrace;
+      },
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(receivedError, isA<Exception>());
+    expect(receivedStackTrace, isNotNull);
+    expect(repo.isLoading.value, isFalse);
+    expect(repo.hasInitialized.value, isTrue);
+
+    repo.dispose();
+  });
+
+  test('onError is not called when no error occurs', () async {
+    final fs = FakeFirebaseFirestore();
+    await fs.doc('foos/u1').set({'name': 'Alice'});
+
+    var errorCount = 0;
+
+    final repo = FirestoreDocRepository<Foo>(
+      firestore: fs,
+      fromJson: Foo.fromJson,
+      docRefBuilder: (f, uid) => f.doc('foos/u1'),
+      subscribe: true,
+      onError: (error, stackTrace) => errorCount++,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(errorCount, 0);
+    expect(repo.value?.name, 'Alice');
+
+    repo.dispose();
+  });
 }

@@ -42,11 +42,13 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
     FirebaseFirestore? firestore,
     AuthUidListenable? authUid, // omit for public/unauthenticated docs
     bool subscribe = true,
+    FirewatchErrorHandler? onError,
   })  : _fs = firestore ?? FirebaseFirestore.instance,
         _fromJson = fromJson,
         _docRefBuilder = docRefBuilder,
         _authUid = authUid,
         _subscribe = subscribe,
+        _onError = onError,
         super(null) {
     _authUid?.addListener(_onAuth);
     _swap(_currentUserUid);
@@ -61,6 +63,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
     String?,
   ) _docRefBuilder;
   final bool _subscribe;
+  final FirewatchErrorHandler? _onError;
 
   // Last materialized data we set as [value]; used to squash metadata churn.
   Map<String, dynamic>? _lastData;
@@ -202,25 +205,34 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
             _markInitialized();
           }
         },
-        onError: (_) {
+        onError: (Object error, StackTrace stackTrace) {
           if (epoch != _epoch) return;
           isLoading.value = false;
           _markInitialized();
+          _onError?.call(error, stackTrace);
         },
       );
     } else {
       // One-shot; prefer server, fall back safely.
-      final snap = await ref.get();
-      if (epoch != _epoch) return; // stale
-      if (snap.exists && snap.data() != null) {
-        final data = Map<String, dynamic>.from(snap.data()!)
-          ..['id'] = snap.id
-          ..['parentId'] = parentIdOf(snap.reference);
-        _lastData = data;
-        value = _fromJson(data);
+      try {
+        final snap = await ref.get();
+        if (epoch != _epoch) return; // stale
+        if (snap.exists && snap.data() != null) {
+          final data = Map<String, dynamic>.from(snap.data()!)
+            ..['id'] = snap.id
+            ..['parentId'] = parentIdOf(snap.reference);
+          _lastData = data;
+          value = _fromJson(data);
+        }
+      } catch (error, stackTrace) {
+        if (epoch != _epoch) return;
+        _onError?.call(error, stackTrace);
+      } finally {
+        if (epoch == _epoch) {
+          isLoading.value = false;
+          _markInitialized();
+        }
       }
-      isLoading.value = false;
-      _markInitialized();
     }
   }
 

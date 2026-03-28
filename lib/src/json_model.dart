@@ -33,3 +33,13 @@ abstract interface class JsonModel {
 ///   - `ValueNotifier<String?>` that you update on auth changes, or
 ///   - a wrapper around Firebase Auth that implements `ValueListenable<String?>`.
 typedef AuthUidListenable = ValueListenable<String?>;
+
+/// Signature for error callbacks used by Firewatch repositories.
+///
+/// Called when a Firestore snapshot listener or one-shot fetch encounters
+/// an error. The [error] and [stackTrace] are forwarded from the underlying
+/// Firestore operation.
+typedef FirewatchErrorHandler = void Function(
+  Object error,
+  StackTrace stackTrace,
+);
