@@ -176,9 +176,9 @@ Update it on sign-in/out and the repos will re-attach.</p>
 <pre class="language-dart"><code class="language-dart">authUid.value = 'abc123'; // sign in
 authUid.value = null; // sign out
 </code></pre>
-<h2 id="commands-api">Commands API</h2>
+<h2 id="write-api">Write API</h2>
 <p>All repos expose <a href="https://pub.dev/packages/command_it"><code>command_it</code></a> async
-commands:</p>
+commands with observable <code>isRunning</code>/<code>errors</code> state:</p>
 <pre class="language-dart"><code class="language-dart">profileRepo.write(UserProfile(id: 'abc123', displayName: 'Marty'));
 profileRepo.patch({'bio': 'Hello'});
 
@@ -190,6 +190,53 @@ allFriendsRepo.set((path: 'users/abc123/friends/f1', model: friend));
 allFriendsRepo.patch((path: 'users/abc123/friends/f1', data: {'name': 'Bob'}));
 allFriendsRepo.delete('users/abc123/friends/f1');
 </code></pre>
+<h3 id="direct-writes-concurrent-safe">Direct writes (concurrent-safe)</h3>
+<p>Commands are single-execution — a second call while the first is in-flight is
+silently dropped. When you need to rapidly write to <strong>different documents</strong> in
+the same collection (e.g. toggling checkboxes), use the <code>*Direct</code> methods:</p>
+<pre class="language-dart"><code class="language-dart">// These return Futures and can overlap safely:
+await friendsRepo.patchDirect((id: 'f1', data: {'checked': true}));
+await friendsRepo.patchDirect((id: 'f2', data: {'checked': false}));
+
+// Also available: addDirect, setDirect, updateDirect, deleteDirect
+</code></pre>
+<h2 id="error-handling">Error handling</h2>
+<p>All repositories accept an optional <code>onError</code> callback for subscription and
+fetch errors:</p>
+<pre class="language-dart"><code class="language-dart">final repo = FirestoreCollectionRepository&lt;Item&gt;(
+  // ...
+  onError: (error, stackTrace) {
+    Sentry.captureException(error, stackTrace: stackTrace);
+    // or show a toast, retry, etc.
+  },
+);
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Error source</th>
+<th>How it surfaces</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Snapshot listener / one-shot fetch</td>
+<td><code>onError</code> callback</td>
+</tr>
+<tr>
+<td>Command-based writes</td>
+<td><code>command.errors</code> ValueNotifier</td>
+</tr>
+<tr>
+<td>Direct writes (<code>*Direct</code>)</td>
+<td>Exception on the returned Future</td>
+</tr>
+<tr>
+<td>Auth guard (no signed-in user)</td>
+<td>Synchronous <code>StateError</code></td>
+</tr>
+</tbody>
+</table>
 <h2 id="ui-state">UI State</h2>
 <ul>
 <li><code>isLoading</code>: true while fetching/refreshing</li>
