@@ -226,6 +226,43 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
     },
   );
 
+  // ── direct writes (concurrent-safe, bypass Command guard) ────────────────
+
+  /// Creates or merges a document without the Command single-execution guard.
+  ///
+  /// Unlike [set], multiple calls can overlap safely.
+  Future<void> setDirect(({String path, T model}) input) {
+    _guardAuth();
+    return _fs
+        .doc(input.path)
+        .set(input.model.toJson(), SetOptions(merge: true));
+  }
+
+  /// Partially updates fields without the Command single-execution guard.
+  ///
+  /// Unlike [patch], multiple calls can overlap safely — use this when
+  /// rapidly editing different documents in the same collection group.
+  Future<void> patchDirect(GroupPatch p) {
+    _guardAuth();
+    return _fs.doc(p.path).update(p.data);
+  }
+
+  /// Fully updates a document without the Command single-execution guard.
+  ///
+  /// Unlike [update], multiple calls can overlap safely.
+  Future<void> updateDirect(({String path, T model}) input) {
+    _guardAuth();
+    return _fs.doc(input.path).update(input.model.toJson());
+  }
+
+  /// Deletes a document without the Command single-execution guard.
+  ///
+  /// Unlike [delete], multiple calls can overlap safely.
+  Future<void> deleteDirect(String path) {
+    _guardAuth();
+    return _fs.doc(path).delete();
+  }
+
   // ── internals ─────────────────────────────────────────────────────────────
 
   void _guardAuth() {

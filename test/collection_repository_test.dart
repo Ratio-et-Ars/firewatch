@@ -1259,4 +1259,166 @@ void main() {
 
     repo.dispose();
   });
+
+  // ── direct write methods ────────────────────────────────────────────────
+
+  test('patchDirect allows concurrent patches to different docs', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final col = fs.collection('users/u1/items');
+    final refA = await col.add({'n': 1});
+    final refB = await col.add({'n': 2});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Fire both patches concurrently — both must succeed
+    await Future.wait([
+      repo.patchDirect((id: refA.id, data: {'n': 10})),
+      repo.patchDirect((id: refB.id, data: {'n': 20})),
+    ]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.firstWhere((i) => i.id == refA.id).n, 10);
+    expect(repo.value.firstWhere((i) => i.id == refB.id).n, 20);
+
+    repo.dispose();
+  });
+
+  test('addDirect allows concurrent adds', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final ids = await Future.wait([
+      repo.addDirect({'n': 1}),
+      repo.addDirect({'n': 2}),
+      repo.addDirect({'n': 3}),
+    ]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(ids.length, 3);
+    expect(ids.toSet().length, 3); // all unique IDs
+    expect(repo.value.length, 3);
+
+    repo.dispose();
+  });
+
+  test('deleteDirect allows concurrent deletes', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final col = fs.collection('users/u1/items');
+    final refA = await col.add({'n': 1});
+    final refB = await col.add({'n': 2});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 2);
+
+    await Future.wait([
+      repo.deleteDirect(refA.id),
+      repo.deleteDirect(refB.id),
+    ]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value, isEmpty);
+
+    repo.dispose();
+  });
+
+  test('setDirect and updateDirect allow concurrent writes', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // setDirect — concurrent creates
+    await Future.wait([
+      repo.setDirect(Item(id: 'a', n: 10)),
+      repo.setDirect(Item(id: 'b', n: 20)),
+    ]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 2);
+
+    // updateDirect — concurrent full updates
+    await Future.wait([
+      repo.updateDirect(Item(id: 'a', n: 100)),
+      repo.updateDirect(Item(id: 'b', n: 200)),
+    ]);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.firstWhere((i) => i.id == 'a').n, 100);
+    expect(repo.value.firstWhere((i) => i.id == 'b').n, 200);
+
+    repo.dispose();
+  });
+
+  test('direct methods throw StateError when auth-gated and no user',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(() => repo.addDirect({'n': 1}), throwsStateError);
+    expect(() => repo.setDirect(Item(id: 'a', n: 1)), throwsStateError);
+    expect(
+      () => repo.patchDirect((id: 'a', data: {'n': 1})),
+      throwsStateError,
+    );
+    expect(() => repo.updateDirect(Item(id: 'a', n: 1)), throwsStateError);
+    expect(() => repo.deleteDirect('a'), throwsStateError);
+
+    repo.dispose();
+  });
 }

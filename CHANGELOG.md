@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.6.0
+
+### Added
+- **Direct write methods** on `FirestoreCollectionRepository`:
+  `addDirect`, `setDirect`, `patchDirect`, `updateDirect`, `deleteDirect`.
+  These bypass the `Command` single-execution guard, allowing concurrent
+  writes to different documents in the same collection. Use them when
+  rapidly editing multiple items (e.g. toggling checkboxes in a list)
+  where the Command-based methods would silently drop overlapping calls.
+- **Direct write methods** on `FirestoreCollectionGroupRepository`:
+  `setDirect`, `patchDirect`, `updateDirect`, `deleteDirect`.
+  Same concurrent-safe semantics for collection group repositories.
+- Existing Command-based CRUD (`patch`, `set`, `update`, `delete`, `add`)
+  remains unchanged for use cases that benefit from `isRunning`/`errors`
+  observability.
+
 ## 1.5.2
 
 ### Fixed

@@ -253,6 +253,44 @@ class FirestoreCollectionRepository<T extends JsonModel>
     (String docId) => _colOrThrow().doc(docId).delete(),
   );
 
+  // ── direct writes (concurrent-safe, bypass Command guard) ────────────────
+
+  /// Adds a document without the Command single-execution guard.
+  ///
+  /// Unlike [add], multiple calls can overlap safely.
+  /// Returns the generated document ID.
+  Future<String> addDirect(Map<String, dynamic> data) async {
+    final ref = await _colOrThrow().add(data);
+    return ref.id;
+  }
+
+  /// Creates or merges a document without the Command single-execution guard.
+  ///
+  /// Unlike [set], multiple calls can overlap safely.
+  Future<void> setDirect(T model) =>
+      _colOrThrow()
+          .doc(model.id)
+          .set(model.toJson(), SetOptions(merge: true));
+
+  /// Partially updates fields without the Command single-execution guard.
+  ///
+  /// Unlike [patch], multiple calls can overlap safely — use this when
+  /// rapidly editing different documents in the same collection.
+  Future<void> patchDirect(Patch p) =>
+      _colOrThrow().doc(p.id).update(p.data);
+
+  /// Fully updates a document without the Command single-execution guard.
+  ///
+  /// Unlike [update], multiple calls can overlap safely.
+  Future<void> updateDirect(T model) =>
+      _colOrThrow().doc(model.id).update(model.toJson());
+
+  /// Deletes a document without the Command single-execution guard.
+  ///
+  /// Unlike [delete], multiple calls can overlap safely.
+  Future<void> deleteDirect(String docId) =>
+      _colOrThrow().doc(docId).delete();
+
   // ── batch operations ─────────────────────────────────────────────────────
 
   /// The maximum number of operations per Firestore [WriteBatch].

@@ -625,6 +625,150 @@ void main() {
     repo.dispose();
   });
 
+  // ── direct write methods ────────────────────────────────────────────────
+
+  test('patchDirect allows concurrent patches to different docs', () async {
+    final fs = FakeFirebaseFirestore();
+    await fs.doc('users/u1/tasks/t1').set({'title': 'A'});
+    await fs.doc('users/u2/tasks/t2').set({'title': 'B'});
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+
+    // Fire both patches concurrently — both must succeed
+    await Future.wait([
+      repo.patchDirect((path: 'users/u1/tasks/t1', data: {'title': 'A2'})),
+      repo.patchDirect((path: 'users/u2/tasks/t2', data: {'title': 'B2'})),
+    ]);
+    await repo.refresh();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final titles = repo.value.map((t) => t.title).toList()..sort();
+    expect(titles, ['A2', 'B2']);
+
+    repo.dispose();
+  });
+
+  test('setDirect and updateDirect allow concurrent writes', () async {
+    final fs = FakeFirebaseFirestore();
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // setDirect — concurrent creates
+    await Future.wait([
+      repo.setDirect(
+        (path: 'users/u1/tasks/t1', model: Task(id: 't1', title: 'A')),
+      ),
+      repo.setDirect(
+        (path: 'users/u2/tasks/t2', model: Task(id: 't2', title: 'B')),
+      ),
+    ]);
+    await repo.refresh();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 2);
+
+    // updateDirect — concurrent full updates
+    await Future.wait([
+      repo.updateDirect(
+        (path: 'users/u1/tasks/t1', model: Task(id: 't1', title: 'A2')),
+      ),
+      repo.updateDirect(
+        (path: 'users/u2/tasks/t2', model: Task(id: 't2', title: 'B2')),
+      ),
+    ]);
+    await repo.refresh();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final titles = repo.value.map((t) => t.title).toList()..sort();
+    expect(titles, ['A2', 'B2']);
+
+    repo.dispose();
+  });
+
+  test('deleteDirect allows concurrent deletes', () async {
+    final fs = FakeFirebaseFirestore();
+    await fs.doc('users/u1/tasks/t1').set({'title': 'A'});
+    await fs.doc('users/u2/tasks/t2').set({'title': 'B'});
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+
+    await Future.wait([
+      repo.deleteDirect('users/u1/tasks/t1'),
+      repo.deleteDirect('users/u2/tasks/t2'),
+    ]);
+    await repo.refresh();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value, isEmpty);
+
+    repo.dispose();
+  });
+
+  test('direct methods throw StateError when auth-gated and no user',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(
+      () => repo.setDirect(
+        (path: 'users/u1/tasks/t1', model: Task(id: 't1', title: 'X')),
+      ),
+      throwsStateError,
+    );
+    expect(
+      () => repo.patchDirect(
+        (path: 'users/u1/tasks/t1', data: {'title': 'X'}),
+      ),
+      throwsStateError,
+    );
+    expect(
+      () => repo.updateDirect(
+        (path: 'users/u1/tasks/t1', model: Task(id: 't1', title: 'X')),
+      ),
+      throwsStateError,
+    );
+    expect(() => repo.deleteDirect('users/u1/tasks/t1'), throwsStateError);
+
+    repo.dispose();
+  });
+
   test('onError callback sets isLoading false on stream error (_resizeWindow)',
       () async {
     final fs = FakeFirebaseFirestore();
