@@ -62,6 +62,7 @@
 <li><span class="parameter" id="-param-firestore"><span class="type-annotation"><a href="https://pub.dev/documentation/cloud_firestore/6.2.0/cloud_firestore/FirebaseFirestore-class.html">FirebaseFirestore</a>?</span> <span class="parameter-name">firestore</span>, </span></li>
 <li><span class="parameter" id="-param-authUid"><span class="type-annotation"><a href="../../firewatch/AuthUidListenable.html">AuthUidListenable</a>?</span> <span class="parameter-name">authUid</span>, </span></li>
 <li><span class="parameter" id="-param-subscribe"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">subscribe</span> = <span class="default-value">true</span>, </span></li>
+<li><span class="parameter" id="-param-onError"><span class="type-annotation"><a href="../../firewatch/FirewatchErrorHandler.html">FirewatchErrorHandler</a>?</span> <span class="parameter-name">onError</span>, </span></li>
 </ol>})
     </section>
     
@@ -79,11 +80,13 @@
   FirebaseFirestore? firestore,
   AuthUidListenable? authUid, &#47;&#47; omit for public&#47;unauthenticated docs
   bool subscribe = true,
+  FirewatchErrorHandler? onError,
 })  : _fs = firestore ?? FirebaseFirestore.instance,
       _fromJson = fromJson,
       _docRefBuilder = docRefBuilder,
       _authUid = authUid,
       _subscribe = subscribe,
+      _onError = onError,
       super(null) {
   _authUid?.addListener(_onAuth);
   _swap(_currentUserUid);
@@ -115,7 +118,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      1.6.0
+      1.7.0
   </span>
   
 </footer>

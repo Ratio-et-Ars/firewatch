@@ -64,6 +64,7 @@
 <li><span class="parameter" id="-param-subscribe"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">subscribe</span> = <span class="default-value">true</span>, </span></li>
 <li><span class="parameter" id="-param-pageSize"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">pageSize</span> = <span class="default-value">25</span>, </span></li>
 <li><span class="parameter" id="-param-paginate"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">paginate</span> = <span class="default-value">true</span>, </span></li>
+<li><span class="parameter" id="-param-onError"><span class="type-annotation"><a href="../../firewatch/FirewatchErrorHandler.html">FirewatchErrorHandler</a>?</span> <span class="parameter-name">onError</span>, </span></li>
 </ol>})
     </section>
     
@@ -106,6 +107,7 @@ immediately against the resolved collection for the current user.</p>
   bool subscribe = true, &#47;&#47; realtime vs one-shot
   int pageSize = 25, &#47;&#47; default page size
   bool paginate = true,
+  FirewatchErrorHandler? onError,
 }) : _fs = firestore ?? FirebaseFirestore.instance,
      _fromJson = fromJson,
      _colRefBuilder = colRefBuilder,
@@ -116,6 +118,7 @@ immediately against the resolved collection for the current user.</p>
      _limit = ValueNotifier&lt;int&gt;(pageSize),
      _pageSize = pageSize,
      _paginate = paginate,
+     _onError = onError,
      super(const []) {
   &#47;&#47; Wire listeners (auth + deps + query + limit)
   _authUid?.addListener(_triggerRebuild);
@@ -154,7 +157,7 @@ immediately against the resolved collection for the current user.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.6.0
+      1.7.0
   </span>
   
 </footer>

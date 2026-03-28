@@ -64,6 +64,7 @@
 <li><span class="parameter" id="-param-subscribe"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">subscribe</span> = <span class="default-value">true</span>, </span></li>
 <li><span class="parameter" id="-param-pageSize"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">pageSize</span> = <span class="default-value">25</span>, </span></li>
 <li><span class="parameter" id="-param-paginate"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">paginate</span> = <span class="default-value">true</span>, </span></li>
+<li><span class="parameter" id="-param-onError"><span class="type-annotation"><a href="../../firewatch/FirewatchErrorHandler.html">FirewatchErrorHandler</a>?</span> <span class="parameter-name">onError</span>, </span></li>
 </ol>})
     </section>
     
@@ -104,6 +105,7 @@ live Firestore updates. If false, fetches a one-shot snapshot only.</li>
   bool subscribe = true,
   int pageSize = 25,
   bool paginate = true,
+  FirewatchErrorHandler? onError,
 }) : _fs = firestore ?? FirebaseFirestore.instance,
      _fromJson = fromJson,
      _queryRefBuilder = queryRefBuilder,
@@ -114,6 +116,7 @@ live Firestore updates. If false, fetches a one-shot snapshot only.</li>
      _limit = ValueNotifier&lt;int&gt;(pageSize),
      _pageSize = pageSize,
      _paginate = paginate,
+     _onError = onError,
      super(const []) {
   _authUid?.addListener(_triggerRebuild);
   for (final d in _deps) {
@@ -151,7 +154,7 @@ live Firestore updates. If false, fetches a one-shot snapshot only.</li>
 <footer>
   <span class="no-break">
     firewatch
-      1.6.0
+      1.7.0
   </span>
   
 </footer>
