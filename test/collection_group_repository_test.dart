@@ -799,6 +799,60 @@ void main() {
 
   // ── onError callback ────────────────────────────────────────────────────
 
+  test('one-shot loadMore triggers _resizeWindow via _fetchOneShotEpoch',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    await _seed(fs);
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      subscribe: false,
+      pageSize: 2,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 3);
+
+    repo.dispose();
+  });
+
+  test('one-shot _resizeWindow with error routes to onError', () async {
+    final fs = FakeFirebaseFirestore();
+    await _seed(fs);
+
+    Object? receivedError;
+    var useError = false;
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) =>
+          useError ? _ErrorQuery() : f.collectionGroup('tasks'),
+      subscribe: false,
+      pageSize: 2,
+      onError: (error, stackTrace) {
+        receivedError = error;
+      },
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+    expect(receivedError, isNull);
+
+    useError = true;
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(receivedError, isA<Exception>());
+
+    repo.dispose();
+  });
+
   test('onError callback receives stream error from _swap', () async {
     Object? receivedError;
     StackTrace? receivedStackTrace;

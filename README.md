@@ -164,10 +164,10 @@ authUid.value = 'abc123'; // sign in
 authUid.value = null; // sign out
 ```
 
-## Commands API
+## Write API
 
 All repos expose [`command_it`](https://pub.dev/packages/command_it) async
-commands:
+commands with observable `isRunning`/`errors` state:
 
 ```dart
 profileRepo.write(UserProfile(id: 'abc123', displayName: 'Marty'));
@@ -181,6 +181,42 @@ allFriendsRepo.set((path: 'users/abc123/friends/f1', model: friend));
 allFriendsRepo.patch((path: 'users/abc123/friends/f1', data: {'name': 'Bob'}));
 allFriendsRepo.delete('users/abc123/friends/f1');
 ```
+
+### Direct writes (concurrent-safe)
+
+Commands are single-execution — a second call while the first is in-flight is
+silently dropped. When you need to rapidly write to **different documents** in
+the same collection (e.g. toggling checkboxes), use the `*Direct` methods:
+
+```dart
+// These return Futures and can overlap safely:
+await friendsRepo.patchDirect((id: 'f1', data: {'checked': true}));
+await friendsRepo.patchDirect((id: 'f2', data: {'checked': false}));
+
+// Also available: addDirect, setDirect, updateDirect, deleteDirect
+```
+
+## Error handling
+
+All repositories accept an optional `onError` callback for subscription and
+fetch errors:
+
+```dart
+final repo = FirestoreCollectionRepository<Item>(
+  // ...
+  onError: (error, stackTrace) {
+    Sentry.captureException(error, stackTrace: stackTrace);
+    // or show a toast, retry, etc.
+  },
+);
+```
+
+| Error source | How it surfaces |
+|---|---|
+| Snapshot listener / one-shot fetch | `onError` callback |
+| Command-based writes | `command.errors` ValueNotifier |
+| Direct writes (`*Direct`) | Exception on the returned Future |
+| Auth guard (no signed-in user) | Synchronous `StateError` |
 
 ## UI State
 

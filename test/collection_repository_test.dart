@@ -1424,6 +1424,72 @@ void main() {
 
   // ── onError callback ────────────────────────────────────────────────────
 
+  test('one-shot loadMore triggers _resizeWindow via _fetchOneShotEpoch',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    for (var i = 0; i < 3; i++) {
+      await col.add({'n': i});
+    }
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: false,
+      pageSize: 2,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 3);
+
+    repo.dispose();
+  });
+
+  test('one-shot _resizeWindow with error routes to onError', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    for (var i = 0; i < 3; i++) {
+      await col.add({'n': i});
+    }
+
+    Object? receivedError;
+    var useError = false;
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) =>
+          useError ? _ErrorCollectionRef() : f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: false,
+      pageSize: 2,
+      onError: (error, stackTrace) {
+        receivedError = error;
+      },
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 2);
+    expect(receivedError, isNull);
+
+    useError = true;
+    await repo.loadMore();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(receivedError, isA<Exception>());
+
+    repo.dispose();
+  });
+
   test('onError callback receives stream error from _swap', () async {
     Object? receivedError;
     StackTrace? receivedStackTrace;
