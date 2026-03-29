@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.1
+
+### Changed
+- Updated README with documentation for direct write methods, error handling
+  table, and `onError` callback usage example.
+- Added one-shot `_resizeWindow` coverage tests for both collection repository
+  types.
+
 ## 1.7.0
 
 ### Added
