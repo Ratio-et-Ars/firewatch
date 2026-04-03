@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.8.0
+
+### Added
+- **Automatic retry on snapshot listener errors.** When a Firestore snapshot
+  listener dies (e.g. `PERMISSION_DENIED` because a parent document hasn't
+  been committed server-side yet), the repository now retries with linear
+  backoff instead of leaving the listener permanently dead.
+- New `FirestoreCollectionRepository` constructor parameters:
+  - `maxRetries` (default: 5) — number of retry attempts before giving up.
+  - `retryDelay` (default: 500 ms) — base delay, multiplied by attempt number
+    (500 ms, 1 s, 1.5 s, 2 s, 2.5 s).
+- Retry counter resets on successful snapshot or on auth/dependency/query
+  change. After `maxRetries` exhausted, the repo settles into
+  `hasInitialized = true` / `isLoading = false` (previous behavior).
+
+### Fixed
+- Race condition where subcollection repos activated before their parent
+  document was server-confirmed during first-time anonymous sign-in. The
+  snapshot listener would hit `PERMISSION_DENIED` and die permanently —
+  writes went through to Firestore but the UI never updated.
+
 ## 1.7.1
 
 ### Changed
