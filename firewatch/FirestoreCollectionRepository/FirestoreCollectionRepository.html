@@ -65,6 +65,8 @@
 <li><span class="parameter" id="-param-pageSize"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">pageSize</span> = <span class="default-value">25</span>, </span></li>
 <li><span class="parameter" id="-param-paginate"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">paginate</span> = <span class="default-value">true</span>, </span></li>
 <li><span class="parameter" id="-param-onError"><span class="type-annotation"><a href="../../firewatch/FirewatchErrorHandler.html">FirewatchErrorHandler</a>?</span> <span class="parameter-name">onError</span>, </span></li>
+<li><span class="parameter" id="-param-maxRetries"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">maxRetries</span> = <span class="default-value">5</span>, </span></li>
+<li><span class="parameter" id="-param-retryDelay"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a></span> <span class="parameter-name">retryDelay</span> = <span class="default-value">const Duration(milliseconds: 500)</span>, </span></li>
 </ol>})
     </section>
     
@@ -108,6 +110,8 @@ immediately against the resolved collection for the current user.</p>
   int pageSize = 25, &#47;&#47; default page size
   bool paginate = true,
   FirewatchErrorHandler? onError,
+  int maxRetries = 5, &#47;&#47; retry on transient listener errors
+  Duration retryDelay = const Duration(milliseconds: 500), &#47;&#47; base delay between retries
 }) : _fs = firestore ?? FirebaseFirestore.instance,
      _fromJson = fromJson,
      _colRefBuilder = colRefBuilder,
@@ -119,6 +123,8 @@ immediately against the resolved collection for the current user.</p>
      _pageSize = pageSize,
      _paginate = paginate,
      _onError = onError,
+     _maxRetries = maxRetries,
+     _retryDelay = retryDelay,
      super(const []) {
   &#47;&#47; Wire listeners (auth + deps + query + limit)
   _authUid?.addListener(_triggerRebuild);
@@ -157,7 +163,7 @@ immediately against the resolved collection for the current user.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.7.1
+      1.8.0
   </span>
   
 </footer>
