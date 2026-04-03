@@ -88,6 +88,8 @@ class FirestoreCollectionRepository<T extends JsonModel>
     int pageSize = 25, // default page size
     bool paginate = true,
     FirewatchErrorHandler? onError,
+    int maxRetries = 5, // retry on transient listener errors
+    Duration retryDelay = const Duration(milliseconds: 500), // base delay between retries
   }) : _fs = firestore ?? FirebaseFirestore.instance,
        _fromJson = fromJson,
        _colRefBuilder = colRefBuilder,
@@ -99,6 +101,8 @@ class FirestoreCollectionRepository<T extends JsonModel>
        _pageSize = pageSize,
        _paginate = paginate,
        _onError = onError,
+       _maxRetries = maxRetries,
+       _retryDelay = retryDelay,
        super(const []) {
     // Wire listeners (auth + deps + query + limit)
     _authUid?.addListener(_triggerRebuild);
@@ -119,6 +123,9 @@ class FirestoreCollectionRepository<T extends JsonModel>
   final bool _subscribe;
   final FirewatchErrorHandler? _onError;
   final List<Listenable> _deps;
+  final int _maxRetries;
+  final Duration _retryDelay;
+  int _retryCount = 0;
 
   final ValueNotifier<QueryMutator?> _queryNotifier;
 
@@ -419,6 +426,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
 
   // ── internals ─────────────────────────────────────────────────────────────
   void _triggerRebuild() {
+    _retryCount = 0; // fresh start on auth/dep/query change
     _limit.value = _pageSize; // reset pagination on query/dep/auth change
     _swap(_currentUserUid, clearExisting: true);
   }
@@ -532,9 +540,19 @@ class FirestoreCollectionRepository<T extends JsonModel>
         },
         onError: (Object error, StackTrace stackTrace) {
           if (epoch != _epoch) return;
-          hasInitialized.value = true;
-          isLoading.value = false;
           _onError?.call(error, stackTrace);
+
+          if (_retryCount < _maxRetries) {
+            _retryCount++;
+            Future.delayed(_retryDelay * _retryCount, () {
+              if (epoch == _epoch) {
+                _swap(uid, clearExisting: false);
+              }
+            });
+          } else {
+            hasInitialized.value = true;
+            isLoading.value = false;
+          }
         },
       );
     } else {
@@ -569,6 +587,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
     QuerySnapshot<Map<String, dynamic>> snap, {
     bool fromOneShot = false,
   }) {
+    _retryCount = 0; // successful snapshot → reset retry counter
     // Incremental: only re-parse changed documents.
     for (final change in snap.docChanges) {
       final doc = change.doc;

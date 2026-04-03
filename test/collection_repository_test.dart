@@ -651,6 +651,7 @@ void main() {
       colRefBuilder: (f, uid) => _ErrorCollectionRef(),
       subscribe: true,
       pageSize: 50,
+      maxRetries: 0,
     );
 
     await Future<void>.delayed(const Duration(milliseconds: 10));
@@ -1500,6 +1501,7 @@ void main() {
       colRefBuilder: (f, uid) => _ErrorCollectionRef(),
       subscribe: true,
       pageSize: 50,
+      maxRetries: 0,
       onError: (error, stackTrace) {
         receivedError = error;
         receivedStackTrace = stackTrace;
@@ -1565,6 +1567,7 @@ void main() {
       colRefBuilder: (f, uid) => _ErrorCollectionRef(),
       subscribe: false,
       pageSize: 50,
+      maxRetries: 0,
       onError: (error, stackTrace) {
         receivedError = error;
         receivedStackTrace = stackTrace;
@@ -1602,6 +1605,152 @@ void main() {
 
     expect(errorCount, 0);
     expect(repo.value.length, 1);
+
+    repo.dispose();
+  });
+
+  // ── retry on transient errors ──────────────────────────────────────────
+
+  test('retries on stream error after auth change and recovers', () async {
+    // Simulates the real-world scenario: authUid goes from null → uid,
+    // triggering _swap. The first snapshot listener hits PERMISSION_DENIED
+    // (parent doc not yet committed). After a retry, the listener succeeds.
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+
+    // Seed data that the repo should eventually see.
+    await fs.collection('users/u1/items').add({'n': 42});
+
+    var callCount = 0;
+    Object? receivedError;
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) {
+        callCount++;
+        // First call with a non-null uid errors (simulates PERMISSION_DENIED).
+        // Subsequent calls succeed.
+        if (uid != null && callCount <= 2) return _ErrorCollectionRef();
+        return f.collection('users/$uid/items');
+      },
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+      maxRetries: 3,
+      retryDelay: const Duration(milliseconds: 10),
+      onError: (error, _) => receivedError = error,
+    );
+
+    // Signed-out state: no data, initialized immediately.
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value, isEmpty);
+    expect(repo.hasInitialized.value, isTrue);
+
+    // Sign in → triggers _swap → first attempt errors.
+    callCount = 0;
+    authUid.value = 'u1';
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // onError was called for the first failed attempt.
+    expect(receivedError, isA<Exception>());
+
+    // After retry delay, the repo should have recovered.
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(repo.value.length, 1);
+    expect(repo.value.first.n, 42);
+    expect(repo.hasInitialized.value, isTrue);
+    expect(repo.isLoading.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('stops retrying after maxRetries is exhausted', () async {
+    final authUid = ValueNotifier<String?>(null);
+    var errorCallCount = 0;
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: FakeFirebaseFirestore(),
+      fromJson: Item.fromJson,
+      // Always errors — never recovers.
+      colRefBuilder: (f, uid) =>
+          uid != null ? _ErrorCollectionRef() : f.collection('items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+      maxRetries: 2,
+      retryDelay: const Duration(milliseconds: 10),
+      onError: (error, _) => errorCallCount++,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Sign in → all retries will fail.
+    authUid.value = 'u1';
+
+    // Wait long enough for initial attempt + 2 retries.
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+
+    // 1 initial + 2 retries = 3 error calls.
+    expect(errorCallCount, 3);
+    // After exhausting retries, repo settles into initialized + not loading.
+    expect(repo.hasInitialized.value, isTrue);
+    expect(repo.isLoading.value, isFalse);
+    expect(repo.value, isEmpty);
+
+    repo.dispose();
+  });
+
+  test('retry counter resets on successful snapshot', () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>(null);
+
+    await fs.collection('users/u1/items').add({'n': 1});
+
+    // Track how many times colRefBuilder is called with a non-null uid.
+    // The first call for each sign-in errors; the retry (second call) succeeds.
+    var uidCallCount = 0;
+    var errorCallCount = 0;
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) {
+        if (uid == null) return f.collection('items'); // signed out
+        uidCallCount++;
+        // Odd calls error, even calls succeed (first attempt fails, retry works).
+        if (uidCallCount.isOdd) return _ErrorCollectionRef();
+        return f.collection('users/$uid/items');
+      },
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+      maxRetries: 2,
+      retryDelay: const Duration(milliseconds: 10),
+      onError: (error, _) => errorCallCount++,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // First sign-in: call #1 (odd) errors, retry call #2 (even) succeeds.
+    authUid.value = 'u1';
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    expect(repo.value.length, 1);
+    expect(errorCallCount, 1);
+
+    // Sign out resets retry counter (via _triggerRebuild).
+    authUid.value = null;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Second sign-in: call #3 (odd) errors, retry call #4 (even) succeeds.
+    // This only works if the retry counter was reset — otherwise retries
+    // would be exhausted from the first sign-in.
+    errorCallCount = 0;
+    authUid.value = 'u1';
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+
+    expect(repo.value.length, 1);
+    expect(errorCallCount, 1); // one error before recovery
 
     repo.dispose();
   });
