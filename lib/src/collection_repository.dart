@@ -459,7 +459,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
 
     isLoading.value = true;
 
-    _cancelSubAsync();
+    unawaited(_cancelSub());
     _modelCache.clear();
 
     try {
@@ -489,12 +489,11 @@ class FirestoreCollectionRepository<T extends JsonModel>
   int _epoch = 0;
 
   // Utility: cancel without ever blocking a swap
-  void _cancelSubAsync() {
+  Future<void> _cancelSub() async {
     final old = _sub;
     _sub = null;
     if (old != null) {
-      // Fire-and-forget; do not await on the hot path.
-      unawaited(old.cancel());
+      await old.cancel();
     }
   }
 
@@ -504,17 +503,26 @@ class FirestoreCollectionRepository<T extends JsonModel>
     isLoading.value = true;
     hasInitialized.value = false;
 
-    _cancelSubAsync();
-    _modelCache.clear();
-
-    if (clearExisting) value = const [];
-
     if (_isAuthGated && uid == null) {
+      // Await cancel on sign-out so the native Firestore listener is
+      // fully torn down before the auth token is invalidated.
+      await _cancelSub();
+      _modelCache.clear();
+      // After the await, the repo may have been disposed by a registry.
+      // Guard against setting values on disposed notifiers.
+      if (epoch != _epoch) return;
+      if (clearExisting) value = const [];
       hasInitialized.value = true;
       hasMore.value = false;
       isLoading.value = false;
       return;
     }
+
+    // On the hot path (auth/query change), fire-and-forget is fine.
+    unawaited(_cancelSub());
+    _modelCache.clear();
+
+    if (clearExisting) value = const [];
 
     hasMore.value = true;
 
@@ -540,6 +548,15 @@ class FirestoreCollectionRepository<T extends JsonModel>
         },
         onError: (Object error, StackTrace stackTrace) {
           if (epoch != _epoch) return;
+          // Don't retry if the repo has been detached (auth-gated with
+          // null UID — e.g. user signed out). The epoch may still match
+          // because _triggerRebuild increments it and _swap returns early
+          // for null UID, leaving the old listener alive briefly.
+          if (_isAuthGated && _currentUserUid == null) {
+            unawaited(_cancelSub());
+            isLoading.value = false;
+            return;
+          }
           _onError?.call(error, stackTrace);
 
           if (_retryCount < _maxRetries) {
@@ -643,7 +660,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   void dispose() {
     ++_epoch; // prevent in-flight async ops from touching disposed notifiers
     _limit.removeListener(_resizeWindow);
-    _cancelSubAsync();
+    unawaited(_cancelSub());
     _authUid?.removeListener(_triggerRebuild);
     _queryNotifier.removeListener(_triggerRebuild);
     for (final d in _deps) {
