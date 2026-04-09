@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.8.1
+
+### Fixed
+- **Sign-out race with snapshot retry loop** (#17): On sign-out, the
+  subscription cancel was fire-and-forget, so the native Firestore listener
+  could fire `PERMISSION_DENIED` errors before the Dart-side cancel reached
+  the native layer. Combined with the retry mechanism from 1.8.0, this
+  created an error loop. The null-UID path in `_swap()` now awaits the
+  subscription cancel, and `onError` suppresses retries when the repo is
+  auth-detached.
+
 ## 1.8.0
 
 ### Added
