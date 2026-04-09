@@ -1754,4 +1754,41 @@ void main() {
 
     repo.dispose();
   });
+
+  test('does not retry when authUid becomes null (sign-out during errors)',
+      () async {
+    final authUid = ValueNotifier<String?>('u1');
+    var errorCallCount = 0;
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: FakeFirebaseFirestore(),
+      fromJson: Item.fromJson,
+      // Always errors — simulates PERMISSION_DENIED after token invalidation.
+      colRefBuilder: (f, uid) => _ErrorCollectionRef(),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+      maxRetries: 5,
+      retryDelay: const Duration(milliseconds: 10),
+      onError: (error, _) => errorCallCount++,
+    );
+
+    // Let the initial error fire.
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    final errorsBeforeSignOut = errorCallCount;
+    expect(errorsBeforeSignOut, greaterThan(0));
+
+    // Sign out — authUid becomes null.
+    authUid.value = null;
+
+    // Wait long enough for all 5 retries to fire if the bug existed.
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+
+    // After sign-out, no further retries should have occurred.
+    // With the bug, errorCallCount would be errorsBeforeSignOut + up to 5 more.
+    expect(errorCallCount, errorsBeforeSignOut,
+        reason: 'No retries should fire after authUid becomes null');
+
+    repo.dispose();
+  });
 }
