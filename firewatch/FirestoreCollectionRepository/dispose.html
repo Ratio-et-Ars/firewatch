@@ -84,7 +84,7 @@ listeners or not immediately before disposal.</p>
 void dispose() {
   ++_epoch; &#47;&#47; prevent in-flight async ops from touching disposed notifiers
   _limit.removeListener(_resizeWindow);
-  _cancelSubAsync();
+  unawaited(_cancelSub());
   _authUid?.removeListener(_triggerRebuild);
   _queryNotifier.removeListener(_triggerRebuild);
   for (final d in _deps) {
