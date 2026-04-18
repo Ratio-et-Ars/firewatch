@@ -259,8 +259,27 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   ///
   /// Only the keys present in the map are modified; all other fields
   /// remain unchanged. Throws [StateError] if not authenticated.
+  ///
+  /// This uses Firestore `.update()` and **fails with `not-found` if the
+  /// document does not yet exist**. Use [setFields] when you want
+  /// partial-upsert semantics (create-if-missing).
   late final patch = Command.createAsyncNoResult<Map<String, dynamic>>(
     (map) => _docOrThrow().update(map),
+  );
+
+  /// Partially sets specific fields on the document, creating it if missing.
+  ///
+  /// Like [patch], only the keys present in the map are modified — other
+  /// fields on an existing doc are preserved. Unlike [patch], this uses
+  /// `set(..., SetOptions(merge: true))` so the doc is created if it
+  /// doesn't exist, instead of throwing `not-found`.
+  ///
+  /// Use this for opt-in flows, default-setting writes, or any partial
+  /// write where the doc may not have been initialized yet.
+  ///
+  /// Throws [StateError] if not authenticated.
+  late final setFields = Command.createAsyncNoResult<Map<String, dynamic>>(
+    (map) => _docOrThrow().set(map, SetOptions(merge: true)),
   );
 
   /// Deletes the document.
@@ -269,6 +288,44 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   late final delete = Command.createAsyncNoParamNoResult(
     () => _docOrThrow().delete(),
   );
+
+  // ── direct writes (concurrent-safe, bypass Command guard) ────────────────
+
+  /// Creates or merges the document with the full model, without the
+  /// Command single-execution guard.
+  ///
+  /// Unlike [write], multiple calls can overlap safely — use this when
+  /// firing rapid successive writes (e.g. autosave during typing).
+  Future<void> writeDirect(T model) =>
+      _docOrThrow().set(model.toJson(), SetOptions(merge: true));
+
+  /// Fully updates the document with the full model, without the Command
+  /// single-execution guard.
+  ///
+  /// Unlike [update], multiple calls can overlap safely.
+  /// Fails if the document does not exist.
+  Future<void> updateDirect(T model) =>
+      _docOrThrow().update(model.toJson());
+
+  /// Partially updates specific fields without the Command guard.
+  ///
+  /// Unlike [patch], multiple calls can overlap safely.
+  /// Fails if the document does not exist — use [setFieldsDirect] for
+  /// partial-upsert semantics.
+  Future<void> patchDirect(Map<String, dynamic> fields) =>
+      _docOrThrow().update(fields);
+
+  /// Partially sets specific fields without the Command guard, creating
+  /// the doc if missing.
+  ///
+  /// Unlike [setFields], multiple calls can overlap safely.
+  Future<void> setFieldsDirect(Map<String, dynamic> fields) =>
+      _docOrThrow().set(fields, SetOptions(merge: true));
+
+  /// Deletes the document without the Command guard.
+  ///
+  /// Unlike [delete], multiple calls can overlap safely.
+  Future<void> deleteDirect() => _docOrThrow().delete();
 
   // ── lifecycle ─────────────────────────────────────────────────────────────
   @override
@@ -279,6 +336,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
     write.dispose();
     update.dispose();
     patch.dispose();
+    setFields.dispose();
     delete.dispose();
     isLoading.dispose();
     hasInitialized.dispose();

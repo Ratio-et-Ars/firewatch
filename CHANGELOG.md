@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.9.0
+
+### Added
+- **Partial upsert on `FirestoreDocRepository`** (#19).
+  - New Command `setFields(Map<String, dynamic>)` — like `patch`, but uses
+    `set(..., SetOptions(merge: true))` so the document is created if it
+    doesn't exist. Use this for opt-in flows, default-setting writes, or
+    any partial write where the doc may not have been initialized yet.
+  - Existing `patch` keeps its `update()` semantics (throws `not-found`
+    on missing doc) for callers that rely on that.
+- **Direct writes on `FirestoreDocRepository`**, mirroring the existing
+  `FirestoreCollectionRepository` Direct API:
+  - `writeDirect(T)` — `set(merge: true)` with full model
+  - `updateDirect(T)` — full-model update (throws if missing)
+  - `patchDirect(Map)` — partial update (throws if missing)
+  - `setFieldsDirect(Map)` — partial upsert (create if missing)
+  - `deleteDirect()` — delete
+  - Use these when you need to fire rapid, overlapping writes that would
+    otherwise be rejected by the Command single-execution guard.
+
 ## 1.8.1
 
 ### Fixed

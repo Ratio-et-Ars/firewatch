@@ -800,4 +800,424 @@ void main() {
 
     repo.dispose();
   });
+
+  group('setFields (partial upsert)', () {
+    test('creates document when it does not exist', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(repo.value, isNull, reason: 'doc should not exist yet');
+
+      await repo.setFields.runAsync({'name': 'Created'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final snap = await fs.doc('foos/u1').get();
+      expect(snap.exists, isTrue);
+      expect(snap.data()?['name'], 'Created');
+      expect(repo.value?.name, 'Created');
+
+      repo.dispose();
+    });
+
+    test('merges into existing doc, preserves other fields', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      await fs.doc('foos/u1').set({
+        'name': 'Alice',
+        'extra': 'keepme',
+      });
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(repo.value?.name, 'Alice');
+
+      await repo.setFields.runAsync({'name': 'Alice B'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final snap = await fs.doc('foos/u1').get();
+      expect(snap.data()?['name'], 'Alice B');
+      expect(snap.data()?['extra'], 'keepme',
+          reason: 'merge must preserve fields not in the patch map');
+      expect(repo.value?.name, 'Alice B');
+
+      repo.dispose();
+    });
+
+    test('patch throws on missing doc, setFields does not', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      // Use patchDirect which bypasses the Command layer entirely, so its
+      // error surfaces through a normal try/catch without needing a global
+      // exception handler.
+      Object? patchError;
+      try {
+        await repo.patchDirect({'name': 'should-fail'});
+      } catch (e) {
+        patchError = e;
+      }
+      expect(patchError, isNotNull,
+          reason: 'patch on missing doc should throw');
+
+      // Now setFields on the same missing doc — should succeed.
+      await repo.setFields.runAsync({'name': 'should-succeed'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final snap = await fs.doc('foos/u1').get();
+      expect(snap.exists, isTrue);
+      expect(snap.data()?['name'], 'should-succeed');
+
+      repo.dispose();
+    });
+
+    test('throws StateError when not authenticated', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>(null);
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      Object? caughtError;
+      Command.globalExceptionHandler = (error, _) {
+        caughtError = error.error;
+      };
+
+      repo.setFields.run({'name': 'nope'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(caughtError, isA<StateError>());
+
+      Command.globalExceptionHandler = null;
+      repo.dispose();
+    });
+
+    test('listener fires on value after setFields creates doc', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      var notifyCount = 0;
+      repo.addListener(() => notifyCount++);
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      final initialNotifies = notifyCount;
+
+      await repo.setFields.runAsync({'name': 'First'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      expect(notifyCount, greaterThan(initialNotifies),
+          reason: 'creating doc via setFields must wake the stream listener');
+      expect(repo.value?.name, 'First');
+
+      repo.dispose();
+    });
+
+    test('multiple setFields calls merge incrementally', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      await repo.setFields.runAsync({'name': 'First'});
+      await repo.setFields.runAsync({'extra': 'added'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final snap = await fs.doc('foos/u1').get();
+      expect(snap.data()?['name'], 'First',
+          reason: 'second setFields should not wipe first field');
+      expect(snap.data()?['extra'], 'added');
+
+      repo.dispose();
+    });
+
+    test('null value in map writes null (Firestore merge semantics)',
+        () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      await fs.doc('foos/u1').set({'name': 'Alice', 'extra': 'keepme'});
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      // Document behavior: merge: true writes nulls as nulls (unlike
+      // FieldValue.delete). Callers that want to remove a field should
+      // use FieldValue.delete() explicitly.
+      await repo.setFields.runAsync({'extra': null});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final snap = await fs.doc('foos/u1').get();
+      expect(snap.data()?['name'], 'Alice');
+      expect(snap.data()?['extra'], isNull);
+
+      repo.dispose();
+    });
+  });
+
+  group('Direct writes (bypass Command guard)', () {
+    test('writeDirect creates or merges full model', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      await repo.writeDirect(Foo(id: 'u1', name: 'DirectWrite'));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final snap = await fs.doc('foos/u1').get();
+      expect(snap.data()?['name'], 'DirectWrite');
+
+      repo.dispose();
+    });
+
+    test('updateDirect fails on missing doc', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      Object? err;
+      try {
+        await repo.updateDirect(Foo(id: 'u1', name: 'nope'));
+      } catch (e) {
+        err = e;
+      }
+      expect(err, isNotNull);
+
+      repo.dispose();
+    });
+
+    test('patchDirect partial-updates existing doc', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+      await fs.doc('foos/u1').set({'name': 'Alice', 'extra': 'keep'});
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      await repo.patchDirect({'name': 'PatchedDirect'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final snap = await fs.doc('foos/u1').get();
+      expect(snap.data()?['name'], 'PatchedDirect');
+      expect(snap.data()?['extra'], 'keep');
+
+      repo.dispose();
+    });
+
+    test('patchDirect fails on missing doc', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      Object? err;
+      try {
+        await repo.patchDirect({'name': 'nope'});
+      } catch (e) {
+        err = e;
+      }
+      expect(err, isNotNull,
+          reason: 'patchDirect should preserve patch semantics (no upsert)');
+
+      repo.dispose();
+    });
+
+    test('setFieldsDirect creates missing doc', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      await repo.setFieldsDirect({'name': 'Upserted'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final snap = await fs.doc('foos/u1').get();
+      expect(snap.exists, isTrue);
+      expect(snap.data()?['name'], 'Upserted');
+
+      repo.dispose();
+    });
+
+    test('deleteDirect removes the doc', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+      await fs.doc('foos/u1').set({'name': 'Alice'});
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      await repo.deleteDirect();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final snap = await fs.doc('foos/u1').get();
+      expect(snap.exists, isFalse);
+
+      repo.dispose();
+    });
+
+    test('direct writes overlap safely (no Command single-execution guard)',
+        () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      // Fire 5 concurrent writes via setFieldsDirect.
+      await Future.wait([
+        repo.setFieldsDirect({'name': 'A'}),
+        repo.setFieldsDirect({'counter': 1}),
+        repo.setFieldsDirect({'counter': 2}),
+        repo.setFieldsDirect({'counter': 3}),
+        repo.setFieldsDirect({'extra': 'tail'}),
+      ]);
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      final snap = await fs.doc('foos/u1').get();
+      expect(snap.exists, isTrue);
+      expect(snap.data()?['name'], 'A');
+      expect(snap.data()?['extra'], 'tail');
+      expect(snap.data()?['counter'], isNotNull);
+
+      repo.dispose();
+    });
+
+    test('direct writes throw StateError when not authenticated',
+        () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>(null);
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      expect(
+        () => repo.setFieldsDirect({'name': 'nope'}),
+        throwsStateError,
+      );
+      expect(
+        () => repo.writeDirect(Foo(id: 'x', name: 'nope')),
+        throwsStateError,
+      );
+      expect(
+        () => repo.patchDirect({'name': 'nope'}),
+        throwsStateError,
+      );
+      expect(() => repo.deleteDirect(), throwsStateError);
+
+      repo.dispose();
+    });
+  });
 }
