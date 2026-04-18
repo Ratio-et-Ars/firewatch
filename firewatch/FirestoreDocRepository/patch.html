@@ -65,6 +65,9 @@
   <p>Partially updates specific fields on the document.</p>
 <p>Only the keys present in the map are modified; all other fields
 remain unchanged. Throws <a href="https://api.flutter.dev/flutter/dart-core/StateError-class.html">StateError</a> if not authenticated.</p>
+<p>This uses Firestore <code>.update()</code> and <strong>fails with <code>not-found</code> if the
+document does not yet exist</strong>. Use <a href="../../firewatch/FirestoreDocRepository/setFields.html">setFields</a> when you want
+partial-upsert semantics (create-if-missing).</p>
 </section>
 
       
@@ -101,7 +104,7 @@ remain unchanged. Throws <a href="https://api.flutter.dev/flutter/dart-core/Stat
 <footer>
   <span class="no-break">
     firewatch
-      1.8.1
+      1.9.0
   </span>
   
 </footer>

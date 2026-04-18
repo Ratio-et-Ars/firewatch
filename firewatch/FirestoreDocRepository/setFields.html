@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
-  <meta name="description" content="API docs for the set property from the FirestoreCollectionGroupRepository class, for the Dart programming language.">
-  <title>set property - FirestoreCollectionGroupRepository class - firewatch library - Dart API</title>
+  <meta name="description" content="API docs for the setFields property from the FirestoreDocRepository class, for the Dart programming language.">
+  <title>setFields property - FirestoreDocRepository class - firewatch library - Dart API</title>
 
 
   
@@ -26,10 +26,10 @@
   <ol class="breadcrumbs gt-separated dark hidden-xs">
     <li><a href="../../index.html">firewatch</a></li>
     <li><a href="../../firewatch/">firewatch.dart</a></li>
-    <li><a href="../../firewatch/FirestoreCollectionGroupRepository-class.html">FirestoreCollectionGroupRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
-    <li class="self-crumb">set property</li>
+    <li><a href="../../firewatch/FirestoreDocRepository-class.html">FirestoreDocRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
+    <li class="self-crumb">setFields property</li>
   </ol>
-  <div class="self-name">set</div>
+  <div class="self-name">setFields</div>
   <form class="search navbar-right" role="search">
     <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
   </form>
@@ -46,36 +46,37 @@
 <div
     id="dartdoc-main-content"
     class="main-content"
-    data-above-sidebar="firewatch&#47;FirestoreCollectionGroupRepository-class-sidebar.html"
+    data-above-sidebar="firewatch&#47;FirestoreDocRepository-class-sidebar.html"
     data-below-sidebar="">
     <div>
-<h1><span class="kind-property">set</span> property 
+<h1><span class="kind-property">setFields</span> property 
 </h1></div>
 
     
       <section class="multi-line-signature">
         
-        <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter">(<span class="field">{<span class="type-annotation">T</span> <span class="field-name">model</span>, </span><span class="field"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="field-name">path</span>}</span>)</span>, <span class="type-parameter">void</span>&gt;</span>
-        <span class="name ">set</span>
+        <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span>, <span class="type-parameter">void</span>&gt;</span>
+        <span class="name ">setFields</span>
         <div class="features"><span class="feature">late</span><span class="feature">final</span></div>
 
       </section>
       
 <section class="desc markdown">
-  <p>Creates or merges a document at a specific path.</p>
-<p>Input: A record with <code>path</code> (full document path) and <code>model</code> (a <code>T</code>).
-Behavior: Writes <code>model.toJson()</code> at the document path,
-merging with existing data if present.</p>
+  <p>Partially sets specific fields on the document, creating it if missing.</p>
+<p>Like <a href="../../firewatch/FirestoreDocRepository/patch.html">patch</a>, only the keys present in the map are modified — other
+fields on an existing doc are preserved. Unlike <a href="../../firewatch/FirestoreDocRepository/patch.html">patch</a>, this uses
+<code>set(..., SetOptions(merge: true))</code> so the doc is created if it
+doesn't exist, instead of throwing <code>not-found</code>.</p>
+<p>Use this for opt-in flows, default-setting writes, or any partial
+write where the doc may not have been initialized yet.</p>
+<p>Throws <a href="https://api.flutter.dev/flutter/dart-core/StateError-class.html">StateError</a> if not authenticated.</p>
 </section>
 
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final set = Command.createAsyncNoResult&lt;({String path, T model})&gt;(
-  (r) {
-    _guardAuth();
-    return _fs.doc(r.path).set(r.model.toJson(), SetOptions(merge: true));
-  },
+  <pre class="language-dart"><code class="language-dart">late final setFields = Command.createAsyncNoResult&lt;Map&lt;String, dynamic&gt;&gt;(
+  (map) =&gt; _docOrThrow().set(map, SetOptions(merge: true)),
 );</code></pre>
 </section>
 
@@ -92,11 +93,11 @@ merging with existing data if present.</p>
 <ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
     <li><a href="../../index.html">firewatch</a></li>
     <li><a href="../../firewatch/">firewatch</a></li>
-    <li><a href="../../firewatch/FirestoreCollectionGroupRepository-class.html">FirestoreCollectionGroupRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
-    <li class="self-crumb">set property</li>
+    <li><a href="../../firewatch/FirestoreDocRepository-class.html">FirestoreDocRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
+    <li class="self-crumb">setFields property</li>
 </ol>
 
-  <h5>FirestoreCollectionGroupRepository class</h5>
+  <h5>FirestoreDocRepository class</h5>
   <div id="dartdoc-sidebar-left-content"></div>
 </div><!--/.sidebar-offcanvas-->
 <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
