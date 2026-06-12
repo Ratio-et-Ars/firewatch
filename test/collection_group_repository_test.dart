@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:firewatch/firewatch.dart';
@@ -18,6 +20,34 @@ class _ErrorQuery implements Query<Map<String, dynamic>> {
   @override
   Future<QuerySnapshot<Map<String, dynamic>>> get([GetOptions? options]) =>
       Future.error(Exception('Simulated get error'));
+
+  @override
+  Query<Map<String, dynamic>> limit(int limit) => this;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnimplementedError('${invocation.memberName}');
+}
+
+// ignore: subtype_of_sealed_class
+/// A Query whose [snapshots] stream is driven by a test-controlled
+/// [StreamController], so a test can emit an error at a precise moment (e.g.
+/// after sign-out) to exercise the auth-detached onError guard. [get] errors
+/// so the cache-prime path is skipped.
+class _ManualQuery implements Query<Map<String, dynamic>> {
+  _ManualQuery(this.controller);
+  final StreamController<QuerySnapshot<Map<String, dynamic>>> controller;
+
+  @override
+  Stream<QuerySnapshot<Map<String, dynamic>>> snapshots({
+    bool includeMetadataChanges = false,
+    ListenSource? source,
+  }) =>
+      controller.stream;
+
+  @override
+  Future<QuerySnapshot<Map<String, dynamic>>> get([GetOptions? options]) =>
+      Future.error(StateError('no cache'));
 
   @override
   Query<Map<String, dynamic>> limit(int limit) => this;
@@ -959,5 +989,70 @@ void main() {
     expect(repo.value.length, 3);
 
     repo.dispose();
+  });
+
+  // ── safety parity with the doc/collection repos (regression) ──────────────
+
+  test('dispose while swap in-flight does not update disposed notifier',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    await _seed(fs);
+    final authUid = ValueNotifier<String?>(null);
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: fs,
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => f.collectionGroup('tasks'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    // Sign in triggers an async _swap (awaits a cache get). Dispose before it
+    // can complete: dispose must bump _epoch so the resumed swap bails instead
+    // of writing to the disposed notifier.
+    authUid.value = 'u1';
+    repo.dispose();
+
+    // Flush any pending microtasks / the in-flight cache get.
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    // The in-flight swap must not have populated the disposed notifier (nor
+    // thrown "used after being disposed").
+    expect(repo.value, isEmpty);
+  });
+
+  test('sign-out does not forward errors from the dying listener', () async {
+    final controller =
+        StreamController<QuerySnapshot<Map<String, dynamic>>>.broadcast();
+    final authUid = ValueNotifier<String?>('u1');
+    var errorCount = 0;
+
+    final repo = FirestoreCollectionGroupRepository<Task>(
+      firestore: FakeFirebaseFirestore(),
+      fromJson: Task.fromJson,
+      queryRefBuilder: (f, uid) => _ManualQuery(controller),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+      onError: (error, _) => errorCount++,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    // Sign out. The dying listener then emits a PERMISSION_DENIED-style error
+    // (as the native layer does before its cancel lands). With the awaited
+    // sign-out cancel + auth-detached onError guard, this must be suppressed.
+    authUid.value = null;
+    if (controller.hasListener) {
+      controller.addError(Exception('permission-denied'));
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+
+    expect(errorCount, 0,
+        reason: 'errors after sign-out must not reach onError');
+
+    repo.dispose();
+    await controller.close();
   });
 }
