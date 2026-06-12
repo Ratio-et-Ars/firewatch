@@ -17,6 +17,13 @@ String? parentIdOf(DocumentReference ref) {
   }
 }
 
+/// Mutates a base collection/group query (e.g. add where/order/limit).
+///
+/// Shared by `FirestoreCollectionRepository` and
+/// `FirestoreCollectionGroupRepository` (and their shared base).
+typedef QueryMutator =
+    Query<Map<String, dynamic>> Function(Query<Map<String, dynamic>> base);
+
 /// A minimal contract for Firestore-backed entities.
 ///
 /// - `id` is always present on in-memory models.

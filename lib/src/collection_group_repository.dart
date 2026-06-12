@@ -1,10 +1,9 @@
-import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:command_it/command_it.dart';
 import 'package:flutter/foundation.dart';
 
-import 'collection_repository.dart' show QueryMutator;
 import 'json_model.dart';
+import 'query_list_repository_base.dart';
 
 /// A builder function that produces a Firestore [Query] for a collection group.
 ///
@@ -41,8 +40,14 @@ typedef GroupPatch = ({String path, Map<String, Object?> data});
 /// Works with or without authentication. Omit [authUid] for public
 /// collection groups that should query Firestore immediately without waiting
 /// for a signed-in user.
+///
+/// The auth-reactive lifecycle (cache-first swap, epoch-guarded races, live
+/// window resizing, sign-out handling, disposal) lives in
+/// [QueryListRepositoryBase], shared with [FirestoreCollectionRepository].
+/// This repo keys items by full document path so same-ID documents under
+/// different parents don't collide.
 class FirestoreCollectionGroupRepository<T extends JsonModel>
-    extends ValueNotifier<List<T>> {
+    extends QueryListRepositoryBase<T> {
   /// Creates a new [FirestoreCollectionGroupRepository].
   ///
   /// Parameters:
@@ -63,125 +68,32 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   /// - [pageSize]: Initial page size for paginated queries (default: 25).
   /// - [paginate]: If true (default), enables pagination via `loadMore()`.
   FirestoreCollectionGroupRepository({
-    required T Function(Map<String, dynamic>) fromJson,
+    required super.fromJson,
     required QueryRefBuilder queryRefBuilder,
-    FirebaseFirestore? firestore,
-    QueryMutator? queryBuilder,
-    AuthUidListenable? authUid,
-    List<Listenable> dependencies = const [],
-    bool subscribe = true,
-    int pageSize = 25,
-    bool paginate = true,
-    FirewatchErrorHandler? onError,
-  }) : _fs = firestore ?? FirebaseFirestore.instance,
-       _fromJson = fromJson,
-       _queryRefBuilder = queryRefBuilder,
-       _authUid = authUid,
-       _subscribe = subscribe,
-       _deps = List.unmodifiable(dependencies),
-       _queryNotifier = ValueNotifier<QueryMutator?>(queryBuilder),
-       _limit = ValueNotifier<int>(pageSize),
-       _pageSize = pageSize,
-       _paginate = paginate,
-       _onError = onError,
-       super(const []) {
-    _authUid?.addListener(_triggerRebuild);
-    for (final d in _deps) {
-      d.addListener(_triggerRebuild);
-    }
-    _queryNotifier.addListener(_triggerRebuild);
-    _limit.addListener(_resizeWindow);
-
-    _swap(_currentUserUid, clearExisting: true);
+    super.firestore,
+    super.queryBuilder,
+    super.authUid,
+    super.dependencies,
+    super.subscribe,
+    super.pageSize,
+    super.paginate,
+    super.onError,
+  }) : _queryRefBuilder = queryRefBuilder {
+    start();
   }
 
-  // ── fields ────────────────────────────────────────────────────────────────
-  final FirebaseFirestore _fs;
-  final AuthUidListenable? _authUid;
-  final T Function(Map<String, dynamic>) _fromJson;
   final QueryRefBuilder _queryRefBuilder;
-  final bool _subscribe;
-  final FirewatchErrorHandler? _onError;
-  final List<Listenable> _deps;
 
-  final ValueNotifier<QueryMutator?> _queryNotifier;
+  // ── base hooks ────────────────────────────────────────────────────────────
+  @override
+  Query<Map<String, dynamic>> queryBase(String? uid) =>
+      _queryRefBuilder(fs, uid);
 
-  // pagination state
-  final int _pageSize;
-  final bool _paginate;
-  final ValueNotifier<int> _limit;
-
-  /// Whether there are more documents beyond the current page.
-  ///
-  /// `true` when the last snapshot returned at least [pageSize] documents,
-  /// indicating another page may be available via [loadMore].
-  final ValueNotifier<bool> hasMore = ValueNotifier<bool>(true);
-  bool _resizing = false;
-
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
-
-  /// Per-item notifiers keyed by full document path, kept in sync with the
-  /// current list. Unlike the collection repo which keys by doc ID, this uses
-  /// the full path to distinguish documents with the same ID under different
-  /// parent collections.
-  final Map<String, ValueNotifier<T?>> _itemNotifiers = {};
-
-  /// Model cache for incremental snapshot processing, keyed by full document
-  /// path.
-  final Map<String, T> _modelCache = {};
-
-  /// Whether the repository is currently fetching data from Firestore.
-  ///
-  /// `true` during initial load, auth transitions, pagination, and refreshes.
-  final ValueNotifier<bool> isLoading = ValueNotifier<bool>(true);
-
-  /// Whether the repository has completed its first query.
-  ///
-  /// `false` until the first snapshot (or cache prime) arrives.
-  final ValueNotifier<bool> hasInitialized = ValueNotifier<bool>(false);
-
-  /// `true` when the first query has not yet completed.
-  bool get isInitializing => !hasInitialized.value && isLoading.value;
-
-  /// `true` when a subsequent fetch is in progress after initial load.
-  bool get isRefreshing => hasInitialized.value && isLoading.value;
-
-  /// `true` when initialization is complete, loading is done, and the
-  /// collection group is empty.
-  bool get showEmpty =>
-      hasInitialized.value && !isLoading.value && value.isEmpty;
-
-  String? get _currentUserUid => _authUid?.value;
-
-  /// Whether this repo requires authentication.
-  bool get _isAuthGated => _authUid != null;
-
-  // ── public API ────────────────────────────────────────────────────────────
-
-  /// Swap the active query; pass `null` to clear and use base query.
-  void setQuery(QueryMutator? qb) {
-    _queryNotifier.value = qb;
-  }
-
-  /// Force a re-attach / refetch using current auth, deps, and query.
-  Future<void> refresh() => _swap(_currentUserUid, clearExisting: true);
-
-  /// Per-item notifier keyed by full document path (kept in sync from the
-  /// collection group results).
-  ValueNotifier<T?> notifierFor(String docPath) =>
-      _itemNotifiers.putIfAbsent(docPath, () => ValueNotifier<T?>(null));
-
-  /// Load the next page. In realtime mode this increases the live window.
-  Future<void> loadMore() async {
-    if (!hasMore.value || _resizing) return;
-    _limit.value = _limit.value + _pageSize;
-  }
-
-  /// Reset to the first page (useful when filters change).
-  Future<void> resetPages() async {
-    hasMore.value = true;
-    _limit.value = _pageSize;
-  }
+  /// Collection groups can contain same-ID documents under different parents,
+  /// so the full document path is the cache/notifier key.
+  @override
+  String keyOf(DocumentSnapshot<Map<String, dynamic>> doc) =>
+      doc.reference.path;
 
   // ── CRUD (by document path) ─────────────────────────────────────────────
 
@@ -192,8 +104,8 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   /// merging with existing data if present.
   late final set = Command.createAsyncNoResult<({String path, T model})>(
     (r) {
-      _guardAuth();
-      return _fs.doc(r.path).set(r.model.toJson(), SetOptions(merge: true));
+      guardAuth();
+      return fs.doc(r.path).set(r.model.toJson(), SetOptions(merge: true));
     },
   );
 
@@ -203,8 +115,8 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   /// Behavior: Calls `.update()` with the entire serialized model.
   late final update = Command.createAsyncNoResult<({String path, T model})>(
     (r) {
-      _guardAuth();
-      return _fs.doc(r.path).update(r.model.toJson());
+      guardAuth();
+      return fs.doc(r.path).update(r.model.toJson());
     },
   );
 
@@ -214,8 +126,8 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   /// Behavior: Only the provided fields are updated.
   late final patch = Command.createAsyncNoResult<GroupPatch>(
     (r) {
-      _guardAuth();
-      return _fs.doc(r.path).update(r.data);
+      guardAuth();
+      return fs.doc(r.path).update(r.data);
     },
   );
 
@@ -224,8 +136,8 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   /// Input: A full document path string.
   late final delete = Command.createAsyncNoResult<String>(
     (path) {
-      _guardAuth();
-      return _fs.doc(path).delete();
+      guardAuth();
+      return fs.doc(path).delete();
     },
   );
 
@@ -235,8 +147,8 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   ///
   /// Unlike [set], multiple calls can overlap safely.
   Future<void> setDirect(({String path, T model}) input) {
-    _guardAuth();
-    return _fs
+    guardAuth();
+    return fs
         .doc(input.path)
         .set(input.model.toJson(), SetOptions(merge: true));
   }
@@ -246,280 +158,33 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   /// Unlike [patch], multiple calls can overlap safely — use this when
   /// rapidly editing different documents in the same collection group.
   Future<void> patchDirect(GroupPatch p) {
-    _guardAuth();
-    return _fs.doc(p.path).update(p.data);
+    guardAuth();
+    return fs.doc(p.path).update(p.data);
   }
 
   /// Fully updates a document without the Command single-execution guard.
   ///
   /// Unlike [update], multiple calls can overlap safely.
   Future<void> updateDirect(({String path, T model}) input) {
-    _guardAuth();
-    return _fs.doc(input.path).update(input.model.toJson());
+    guardAuth();
+    return fs.doc(input.path).update(input.model.toJson());
   }
 
   /// Deletes a document without the Command single-execution guard.
   ///
   /// Unlike [delete], multiple calls can overlap safely.
   Future<void> deleteDirect(String path) {
-    _guardAuth();
-    return _fs.doc(path).delete();
-  }
-
-  // ── internals ─────────────────────────────────────────────────────────────
-
-  void _guardAuth() {
-    if (_isAuthGated && _currentUserUid == null) {
-      throw StateError('No signed-in user; repository is detached.');
-    }
-  }
-
-  void _triggerRebuild() {
-    _limit.value = _pageSize;
-    _swap(_currentUserUid, clearExisting: true);
-  }
-
-  Query<Map<String, dynamic>> _queryWith(String? uid) {
-    final base = _queryRefBuilder(_fs, uid);
-    final qb = _queryNotifier.value;
-    final q = qb == null ? base : qb(base);
-    return _paginate ? q.limit(_limit.value) : q;
-  }
-
-  Future<void> _resizeWindow() async {
-    if (_resizing) return;
-    final uid = _currentUserUid;
-    if (_isAuthGated && uid == null) return;
-
-    _resizing = true;
-    final epoch = ++_epoch;
-
-    isLoading.value = true;
-
-    _cancelSubAsync();
-    _modelCache.clear();
-
-    try {
-      final q = _queryWith(uid);
-
-      if (_subscribe) {
-        _sub = q.snapshots().listen(
-          (snap) {
-            if (epoch != _epoch) return;
-            _handleSnap(snap, fromOneShot: false);
-          },
-          onError: (Object error, StackTrace stackTrace) {
-            if (epoch != _epoch) return;
-            // Don't forward errors if the repo has been detached (auth-gated
-            // with null UID — e.g. user signed out). The old listener can fire
-            // PERMISSION_DENIED before its cancel reaches the native layer.
-            if (_isAuthGated && _currentUserUid == null) {
-              _cancelSubAsync();
-              isLoading.value = false;
-              return;
-            }
-            isLoading.value = false;
-            _onError?.call(error, stackTrace);
-          },
-        );
-      } else {
-        await _fetchOneShotEpoch(epoch);
-      }
-    } finally {
-      _resizing = false;
-    }
-  }
-
-  int _epoch = 0;
-
-  void _cancelSubAsync() {
-    final old = _sub;
-    _sub = null;
-    if (old != null) {
-      unawaited(old.cancel());
-    }
-  }
-
-  // Awaitable cancel — used on sign-out so the native Firestore listener is
-  // fully torn down before the auth token is invalidated.
-  Future<void> _cancelSub() async {
-    final old = _sub;
-    _sub = null;
-    if (old != null) {
-      await old.cancel();
-    }
-  }
-
-  Future<void> _swap(String? uid, {bool clearExisting = true}) async {
-    final epoch = ++_epoch;
-
-    isLoading.value = true;
-    hasInitialized.value = false;
-
-    if (_isAuthGated && uid == null) {
-      // Await cancel on sign-out so the native Firestore listener is fully
-      // torn down before the auth token is invalidated. Otherwise the still
-      // -live listener can fire PERMISSION_DENIED against the revoked token.
-      await _cancelSub();
-      _modelCache.clear();
-      // After the await, the repo may have been disposed by a registry.
-      // Guard against setting values on disposed notifiers.
-      if (epoch != _epoch) return;
-      if (clearExisting) value = const [];
-      hasInitialized.value = true;
-      hasMore.value = false;
-      isLoading.value = false;
-      return;
-    }
-
-    // On the hot path (auth/query change), fire-and-forget is fine.
-    _cancelSubAsync();
-    _modelCache.clear();
-
-    if (clearExisting) value = const [];
-
-    hasMore.value = true;
-
-    final q = _queryWith(uid);
-
-    // Prime from CACHE for instant UI, if available.
-    try {
-      final cacheSnap = await q.get(const GetOptions(source: Source.cache));
-      if (epoch != _epoch) return;
-      if (cacheSnap.docs.isNotEmpty) {
-        _handleSnap(cacheSnap, fromOneShot: false);
-      }
-    } catch (_) {
-      if (epoch != _epoch) return;
-    }
-
-    if (_subscribe) {
-      _sub = q.snapshots().listen(
-        (snap) {
-          if (epoch != _epoch) return;
-          _handleSnap(snap, fromOneShot: false);
-        },
-        onError: (Object error, StackTrace stackTrace) {
-          if (epoch != _epoch) return;
-          // Don't forward errors if the repo has been detached (auth-gated
-          // with null UID — e.g. user signed out). The old listener can fire
-          // PERMISSION_DENIED before its cancel reaches the native layer.
-          if (_isAuthGated && _currentUserUid == null) {
-            _cancelSubAsync();
-            isLoading.value = false;
-            return;
-          }
-          hasInitialized.value = true;
-          isLoading.value = false;
-          _onError?.call(error, stackTrace);
-        },
-      );
-    } else {
-      await _fetchOneShotEpoch(epoch);
-    }
-  }
-
-  Future<void> _fetchOneShotEpoch(int epoch) async {
-    try {
-      final uid = _currentUserUid;
-      if (_isAuthGated && uid == null) {
-        if (epoch != _epoch) return;
-        hasInitialized.value = true;
-        return;
-      }
-
-      final snap = await _queryWith(uid).get();
-      if (epoch != _epoch) return;
-      _handleSnap(snap, fromOneShot: true);
-    } catch (error, stackTrace) {
-      if (epoch != _epoch) return;
-      _onError?.call(error, stackTrace);
-    } finally {
-      if (epoch == _epoch) {
-        isLoading.value = false;
-        hasInitialized.value = true;
-      }
-    }
-  }
-
-  void _handleSnap(
-    QuerySnapshot<Map<String, dynamic>> snap, {
-    bool fromOneShot = false,
-  }) {
-    // Incremental: only re-parse changed documents, keyed by path.
-    for (final change in snap.docChanges) {
-      final doc = change.doc;
-      final path = doc.reference.path;
-      if (change.type == DocumentChangeType.removed) {
-        _modelCache.remove(path);
-      } else if (doc.data() != null) {
-        final data = Map<String, dynamic>.from(doc.data()!)
-          ..['id'] = doc.id
-          ..['parentId'] = parentIdOf(doc.reference);
-        _modelCache[path] = _fromJson(data);
-      }
-    }
-
-    // Build list in snapshot order using cached models.
-    final list = <T>[];
-    final activePaths = <String>{};
-    for (final doc in snap.docs) {
-      final path = doc.reference.path;
-      activePaths.add(path);
-      final model = _modelCache[path];
-      if (model != null) {
-        list.add(model);
-      } else {
-        final data = Map<String, dynamic>.from(doc.data())
-          ..['id'] = doc.id
-          ..['parentId'] = parentIdOf(doc.reference);
-        final m = _fromJson(data);
-        _modelCache[path] = m;
-        list.add(m);
-      }
-      _itemNotifiers
-          .putIfAbsent(path, () => ValueNotifier<T?>(null))
-          .value = _modelCache[path];
-    }
-
-    // Prune notifiers for documents no longer in the snapshot.
-    _itemNotifiers.removeWhere((path, notifier) {
-      if (!activePaths.contains(path)) {
-        notifier.value = null;
-        return true;
-      }
-      return false;
-    });
-
-    value = list;
-    isLoading.value = false;
-    hasInitialized.value = true;
-    hasMore.value = snap.docs.length >= _limit.value;
+    guardAuth();
+    return fs.doc(path).delete();
   }
 
   // ── lifecycle ─────────────────────────────────────────────────────────────
   @override
   void dispose() {
-    ++_epoch; // prevent in-flight async ops from touching disposed notifiers
-    _limit.removeListener(_resizeWindow);
-    _cancelSubAsync();
-    _authUid?.removeListener(_triggerRebuild);
-    _queryNotifier.removeListener(_triggerRebuild);
-    for (final d in _deps) {
-      d.removeListener(_triggerRebuild);
-    }
     set.dispose();
     update.dispose();
     patch.dispose();
     delete.dispose();
-    _queryNotifier.dispose();
-    isLoading.dispose();
-    hasInitialized.dispose();
-    for (final n in _itemNotifiers.values) {
-      n.dispose();
-    }
-    _limit.dispose();
-    hasMore.dispose();
     super.dispose();
   }
 }

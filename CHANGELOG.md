@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.10.2
+
+### Changed
+- **Internal: the collection and collection-group repos now share a single
+  lifecycle base** (`QueryListRepositoryBase`), and all three repos share the
+  auth / epoch / subscription primitives (`AuthReactiveLifecycle`). This
+  removes the duplicated swap / cache-prime / window-resize / snapshot /
+  dispose logic that had drifted between the collection and collection-group
+  repos — the very drift that required the 1.10.1 fixes — so that class of bug
+  can no longer recur. **No public API changes.**
+
+### Fixed
+- Collection-repo pagination (`loadMore`) stream errors now suppress errors
+  from a detached (signed-out) repo, matching the primary listener and the
+  collection-group repo.
+
 ## 1.10.1
 
 ### Fixed
