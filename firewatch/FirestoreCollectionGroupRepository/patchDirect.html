@@ -73,8 +73,8 @@ rapidly editing different documents in the same collection group.</p>
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; patchDirect(GroupPatch p) {
-  _guardAuth();
-  return _fs.doc(p.path).update(p.data);
+  guardAuth();
+  return fs.doc(p.path).update(p.data);
 }</code></pre>
 </section>
 
@@ -103,7 +103,7 @@ rapidly editing different documents in the same collection group.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.10.1
+      1.10.2
   </span>
   
 </footer>

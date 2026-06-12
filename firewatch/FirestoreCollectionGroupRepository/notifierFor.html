@@ -55,24 +55,23 @@
     <section class="multi-line-signature">
       
 <span class="returntype"><a href="https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html">ValueNotifier</a><span class="signature">&lt;<wbr><span class="type-parameter">T?</span>&gt;</span></span>
-<span class="name ">notifierFor</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="notifierFor-param-docPath"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">docPath</span></span></li>
+<span class="name ">notifierFor</span>(<wbr><ol class="parameter-list single-line"> <li><span class="parameter" id="notifierFor-param-key"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">key</span></span></li>
 </ol>)
 
-      
+      <div class="features"><span class="feature">inherited</span></div>
 
     </section>
     
 <section class="desc markdown">
-  <p>Per-item notifier keyed by full document path (kept in sync from the
-collection group results).</p>
+  <p>Per-item notifier (kept in sync from the results), keyed by <code>keyOf</code>.</p>
 </section>
 
 
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">ValueNotifier&lt;T?&gt; notifierFor(String docPath) =&gt;
-    _itemNotifiers.putIfAbsent(docPath, () =&gt; ValueNotifier&lt;T?&gt;(null));</code></pre>
+  <pre class="language-dart"><code class="language-dart">ValueNotifier&lt;T?&gt; notifierFor(String key) =&gt;
+    _itemNotifiers.putIfAbsent(key, () =&gt; ValueNotifier&lt;T?&gt;(null));</code></pre>
 </section>
 
 
@@ -100,7 +99,7 @@ collection group results).</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.10.1
+      1.10.2
   </span>
   
 </footer>

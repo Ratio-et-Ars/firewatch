@@ -100,41 +100,20 @@ immediately against the resolved collection for the current user.</p>
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">FirestoreCollectionRepository({
-  required T Function(Map&lt;String, dynamic&gt;) fromJson,
+  required super.fromJson,
   required ColRefBuilder colRefBuilder,
-  FirebaseFirestore? firestore,
-  QueryMutator? queryBuilder, &#47;&#47; optional initial query
-  AuthUidListenable? authUid, &#47;&#47; omit for public&#47;unauthenticated collections
-  List&lt;Listenable&gt; dependencies = const [], &#47;&#47; extra listenables to watch
-  bool subscribe = true, &#47;&#47; realtime vs one-shot
-  int pageSize = 25, &#47;&#47; default page size
-  bool paginate = true,
-  FirewatchErrorHandler? onError,
-  int maxRetries = 5, &#47;&#47; retry on transient listener errors
-  Duration retryDelay = const Duration(milliseconds: 500), &#47;&#47; base delay between retries
-}) : _fs = firestore ?? FirebaseFirestore.instance,
-     _fromJson = fromJson,
-     _colRefBuilder = colRefBuilder,
-     _authUid = authUid,
-     _subscribe = subscribe,
-     _deps = List.unmodifiable(dependencies),
-     _queryNotifier = ValueNotifier&lt;QueryMutator?&gt;(queryBuilder),
-     _limit = ValueNotifier&lt;int&gt;(pageSize),
-     _pageSize = pageSize,
-     _paginate = paginate,
-     _onError = onError,
-     _maxRetries = maxRetries,
-     _retryDelay = retryDelay,
-     super(const []) {
-  &#47;&#47; Wire listeners (auth + deps + query + limit)
-  _authUid?.addListener(_triggerRebuild);
-  for (final d in _deps) {
-    d.addListener(_triggerRebuild);
-  }
-  _queryNotifier.addListener(_triggerRebuild);
-  _limit.addListener(_resizeWindow);
-
-  _swap(_currentUserUid, clearExisting: true);
+  super.firestore,
+  super.queryBuilder,
+  super.authUid,
+  super.dependencies,
+  super.subscribe,
+  super.pageSize,
+  super.paginate,
+  super.onError,
+  super.maxRetries = 5, &#47;&#47; retry on transient listener errors
+  super.retryDelay,
+}) : _colRefBuilder = colRefBuilder {
+  start();
 }</code></pre>
 </section>
 
@@ -163,7 +142,7 @@ immediately against the resolved collection for the current user.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.10.1
+      1.10.2
   </span>
   
 </footer>

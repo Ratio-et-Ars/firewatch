@@ -72,8 +72,8 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; deleteDirect(String path) {
-  _guardAuth();
-  return _fs.doc(path).delete();
+  guardAuth();
+  return fs.doc(path).delete();
 }</code></pre>
 </section>
 
@@ -102,7 +102,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      1.10.1
+      1.10.2
   </span>
   
 </footer>

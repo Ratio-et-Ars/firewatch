@@ -69,6 +69,11 @@ Write commands use full document paths instead of document IDs.</p>
 <p>Works with or without authentication. Omit <code>authUid</code> for public
 collection groups that should query Firestore immediately without waiting
 for a signed-in user.</p>
+<p>The auth-reactive lifecycle (cache-first swap, epoch-guarded races, live
+window resizing, sign-out handling, disposal) lives in
+<code>QueryListRepositoryBase</code>, shared with <a href="../firewatch/FirestoreCollectionRepository-class.html">FirestoreCollectionRepository</a>.
+This repo keys items by full document path so same-ID documents under
+different parents don't collide.</p>
 </section>
 
 
@@ -118,6 +123,18 @@ for a signed-in user.</p>
       id="instance-properties">
     <h2>Properties</h2>
     <dl class="properties">
+        <dt id="currentUserUid" class="property inherited">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/currentUserUid.html">currentUserUid</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span>
+  
+
+</dt>
+<dd class="inherited">
+  The current user UID (or <code>null</code> when signed out / public).
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
         <dt id="delete" class="property">
   <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/delete.html">delete</a></span>
   <span class="signature">&#8594; <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">void</span>&gt;</span></span>
@@ -127,6 +144,32 @@ for a signed-in user.</p>
 <dd>
   Deletes a document by its full path.
   <div class="features"><span class="feature">late</span><span class="feature">final</span></div>
+
+</dd>
+
+        <dt id="epoch" class="property inherited">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/epoch.html">epoch</a></span>
+  <span class="signature">&#8596; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  Epoch counter used to discard stale async operations. Every swap/resize
+captures the current epoch and bails if it changes (a newer swap, or
+dispose, ran in the meantime).
+  <div class="features"><span class="feature">getter/setter pair</span><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="fs" class="property inherited">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/fs.html">fs</a></span>
+  <span class="signature">&#8594; <a href="https://pub.dev/documentation/cloud_firestore/6.5.0/cloud_firestore/FirebaseFirestore-class.html">FirebaseFirestore</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  
+  <div class="features"><span class="feature">final</span><span class="feature">inherited</span></div>
 
 </dd>
 
@@ -142,15 +185,15 @@ for a signed-in user.</p>
 
 </dd>
 
-        <dt id="hasInitialized" class="property">
+        <dt id="hasInitialized" class="property inherited">
   <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/hasInitialized.html">hasInitialized</a></span>
   <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html">ValueNotifier</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>&gt;</span></span>
   
 
 </dt>
-<dd>
+<dd class="inherited">
   Whether the repository has completed its first query.
-  <div class="features"><span class="feature">final</span></div>
+  <div class="features"><span class="feature">final</span><span class="feature">inherited</span></div>
 
 </dd>
 
@@ -166,51 +209,64 @@ for a signed-in user.</p>
 
 </dd>
 
-        <dt id="hasMore" class="property">
+        <dt id="hasMore" class="property inherited">
   <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/hasMore.html">hasMore</a></span>
   <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html">ValueNotifier</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>&gt;</span></span>
   
 
 </dt>
-<dd>
+<dd class="inherited">
   Whether there are more documents beyond the current page.
-  <div class="features"><span class="feature">final</span></div>
+  <div class="features"><span class="feature">final</span><span class="feature">inherited</span></div>
 
 </dd>
 
-        <dt id="isInitializing" class="property">
+        <dt id="isAuthGated" class="property inherited">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/isAuthGated.html">isAuthGated</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  Whether this repo requires authentication. True when an auth source was
+provided; false for public/unauthenticated repos.
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="isInitializing" class="property inherited">
   <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/isInitializing.html">isInitializing</a></span>
   <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>
   
 
 </dt>
-<dd>
+<dd class="inherited">
   <code>true</code> when the first query has not yet completed.
-  <div class="features"><span class="feature">no setter</span></div>
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
 
 </dd>
 
-        <dt id="isLoading" class="property">
+        <dt id="isLoading" class="property inherited">
   <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/isLoading.html">isLoading</a></span>
   <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html">ValueNotifier</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>&gt;</span></span>
   
 
 </dt>
-<dd>
+<dd class="inherited">
   Whether the repository is currently fetching data from Firestore.
-  <div class="features"><span class="feature">final</span></div>
+  <div class="features"><span class="feature">final</span><span class="feature">inherited</span></div>
 
 </dd>
 
-        <dt id="isRefreshing" class="property">
+        <dt id="isRefreshing" class="property inherited">
   <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/isRefreshing.html">isRefreshing</a></span>
   <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>
   
 
 </dt>
-<dd>
+<dd class="inherited">
   <code>true</code> when a subsequent fetch is in progress after initial load.
-  <div class="features"><span class="feature">no setter</span></div>
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
 
 </dd>
 
@@ -250,16 +306,28 @@ for a signed-in user.</p>
 
 </dd>
 
-        <dt id="showEmpty" class="property">
+        <dt id="showEmpty" class="property inherited">
   <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/showEmpty.html">showEmpty</a></span>
   <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>
   
 
 </dt>
-<dd>
-  <code>true</code> when initialization is complete, loading is done, and the
-collection group is empty.
-  <div class="features"><span class="feature">no setter</span></div>
+<dd class="inherited">
+  <code>true</code> when initialization is complete, loading is done, and the list is
+empty.
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="sub" class="property inherited">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/sub.html">sub</a></span>
+  <span class="signature">&#8596; <a href="https://api.flutter.dev/flutter/dart-async/StreamSubscription-class.html">StreamSubscription</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Object-class.html">Object</a>?</span>&gt;</span>?</span>
+  
+
+</dt>
+<dd class="inherited">
+  The active snapshot subscription, if any.
+  <div class="features"><span class="feature">getter/setter pair</span><span class="feature">inherited</span></div>
 
 </dd>
 
@@ -309,6 +377,37 @@ collection group is empty.
 
 </dd>
 
+        <dt id="cancelSub" class="callable inherited">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/cancelSub.html">cancelSub</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  Cancel the active subscription, awaiting the cancel. Used on sign-out so
+the native Firestore listener is fully torn down before the auth token is
+invalidated (otherwise the dying listener can fire <code>PERMISSION_DENIED</code>
+against the revoked token).
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="cancelSubAsync" class="callable inherited">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/cancelSubAsync.html">cancelSubAsync</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; void</span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  Cancel the active subscription without blocking the hot path. Safe for
+auth/query/dependency changes where ordering with the native layer does
+not matter (the epoch guard discards any late events).
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
         <dt id="debounce" class="callable">
   <span class="name"><a href="https://pub.dev/documentation/listen_it/5.3.5/listen_it/FunctionaListener2/debounce.html">debounce</a></span><span class="signature">(<wbr><span class="parameter" id="debounce-param-timeOut"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a></span> <span class="parameter-name">timeOut</span></span>)
     <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/foundation/Listenable-class.html">Listenable</a></span>
@@ -347,8 +446,36 @@ collection group is empty.
 
 </dt>
 <dd>
-  Discards any resources used by the object.
-  <div class="features"><span class="feature">override</span></div>
+  Tears down the shared lifecycle. Subclasses override <a href="../firewatch/FirestoreCollectionGroupRepository/dispose.html">dispose</a> to dispose
+their own Commands and then call <code>super.dispose()</code>.
+  
+
+</dd>
+
+        <dt id="guardAuth" class="callable inherited">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/guardAuth.html">guardAuth</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; void</span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  Throws if the repo is auth-gated and there is no signed-in user.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="keyOf" class="callable">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/keyOf.html">keyOf</a></span><span class="signature">(<wbr><span class="parameter" id="keyOf-param-doc"><span class="type-annotation"><a href="https://pub.dev/documentation/cloud_firestore/6.5.0/cloud_firestore/DocumentSnapshot-class.html">DocumentSnapshot</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span>&gt;</span></span> <span class="parameter-name">doc</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Collection groups can contain same-ID documents under different parents,
+so the full document path is the cache/notifier key.
+  
 
 </dd>
 
@@ -375,16 +502,16 @@ is possible to uninstall the <code>handler</code> from the <code>handler</code> 
 
 </dd>
 
-        <dt id="loadMore" class="callable">
+        <dt id="loadMore" class="callable inherited">
   <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/loadMore.html">loadMore</a></span><span class="signature">(<wbr>)
     <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
 </dt>
-<dd>
+<dd class="inherited">
   Load the next page. In realtime mode this increases the live window.
-  
+  <div class="features"><span class="feature">inherited</span></div>
 
 </dd>
 
@@ -401,17 +528,16 @@ is possible to uninstall the <code>handler</code> from the <code>handler</code> 
 
 </dd>
 
-        <dt id="notifierFor" class="callable">
-  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/notifierFor.html">notifierFor</a></span><span class="signature">(<wbr><span class="parameter" id="notifierFor-param-docPath"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">docPath</span></span>)
+        <dt id="notifierFor" class="callable inherited">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/notifierFor.html">notifierFor</a></span><span class="signature">(<wbr><span class="parameter" id="notifierFor-param-key"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span> <span class="parameter-name">key</span></span>)
     <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html">ValueNotifier</a><span class="signature">&lt;<wbr><span class="type-parameter">T?</span>&gt;</span></span>
   </span>
   
 
 </dt>
-<dd>
-  Per-item notifier keyed by full document path (kept in sync from the
-collection group results).
-  
+<dd class="inherited">
+  Per-item notifier (kept in sync from the results), keyed by <code>keyOf</code>.
+  <div class="features"><span class="feature">inherited</span></div>
 
 </dd>
 
@@ -441,16 +567,30 @@ collection group results).
 
 </dd>
 
-        <dt id="refresh" class="callable">
+        <dt id="queryBase" class="callable">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/queryBase.html">queryBase</a></span><span class="signature">(<wbr><span class="parameter" id="queryBase-param-uid"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">uid</span></span>)
+    <span class="returntype parameter">&#8594; <a href="https://pub.dev/documentation/cloud_firestore/6.5.0/cloud_firestore/Query-class.html">Query</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd>
+  Resolves the base query (before <code>queryBuilder</code> and the live-window limit)
+for the given <code>uid</code>.
+  
+
+</dd>
+
+        <dt id="refresh" class="callable inherited">
   <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/refresh.html">refresh</a></span><span class="signature">(<wbr>)
     <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
 </dt>
-<dd>
+<dd class="inherited">
   Force a re-attach / refetch using current auth, deps, and query.
-  
+  <div class="features"><span class="feature">inherited</span></div>
 
 </dd>
 
@@ -468,16 +608,16 @@ notified when the object changes.
 
 </dd>
 
-        <dt id="resetPages" class="callable">
+        <dt id="resetPages" class="callable inherited">
   <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/resetPages.html">resetPages</a></span><span class="signature">(<wbr>)
     <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
   </span>
   
 
 </dt>
-<dd>
+<dd class="inherited">
   Reset to the first page (useful when filters change).
-  
+  <div class="features"><span class="feature">inherited</span></div>
 
 </dd>
 
@@ -494,16 +634,30 @@ notified when the object changes.
 
 </dd>
 
-        <dt id="setQuery" class="callable">
+        <dt id="setQuery" class="callable inherited">
   <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/setQuery.html">setQuery</a></span><span class="signature">(<wbr><span class="parameter" id="setQuery-param-qb"><span class="type-annotation"><a href="../firewatch/QueryMutator.html">QueryMutator</a>?</span> <span class="parameter-name">qb</span></span>)
     <span class="returntype parameter">&#8594; void</span>
   </span>
   
 
 </dt>
-<dd>
-  Swap the active query; pass <code>null</code> to clear and use base query.
+<dd class="inherited">
+  Swap the active query; pass <code>null</code> to clear and use the base query.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="start" class="callable inherited">
+  <span class="name"><a href="../firewatch/FirestoreCollectionGroupRepository/start.html">start</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; void</span>
+  </span>
   
+
+</dt>
+<dd class="inherited">
+  Runs the initial query. Subclasses call this at the end of their
+constructor (after their own fields are initialized).
+  <div class="features"><span class="feature">inherited</span></div>
 
 </dd>
 
@@ -583,7 +737,7 @@ notified when the object changes.
 <footer>
   <span class="no-break">
     firewatch
-      1.10.1
+      1.10.2
   </span>
   
 </footer>

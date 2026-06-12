@@ -62,18 +62,13 @@
 <span class="returntype">void</span>
 <span class="name ">dispose</span>(<wbr>)
 
-      <div class="features"><span class="feature">override</span></div>
+      
 
     </section>
     
 <section class="desc markdown">
-  <p>Discards any resources used by the object.</p>
-<p>After this is called, the object is not in a usable state and should be
-discarded (calls to <a href="https://api.flutter.dev/flutter/foundation/ChangeNotifier/addListener.html">addListener</a> will throw after the object is disposed).</p>
-<p>This method should only be called by the object's owner.</p>
-<p>This method does not notify listeners, and clears the listener list once
-it is called. Consumers of this class must decide on whether to notify
-listeners or not immediately before disposal.</p>
+  <p>Tears down the shared lifecycle. Subclasses override <a href="../../firewatch/FirestoreCollectionRepository/dispose.html">dispose</a> to dispose
+their own Commands and then call <code>super.dispose()</code>.</p>
 </section>
 
 
@@ -82,14 +77,6 @@ listeners or not immediately before disposal.</p>
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">@override
 void dispose() {
-  ++_epoch; &#47;&#47; prevent in-flight async ops from touching disposed notifiers
-  _limit.removeListener(_resizeWindow);
-  unawaited(_cancelSub());
-  _authUid?.removeListener(_triggerRebuild);
-  _queryNotifier.removeListener(_triggerRebuild);
-  for (final d in _deps) {
-    d.removeListener(_triggerRebuild);
-  }
   add.dispose();
   set.dispose();
   patch.dispose();
@@ -100,14 +87,6 @@ void dispose() {
   batchPatch.dispose();
   batchUpdate.dispose();
   batchDelete.dispose();
-  _queryNotifier.dispose();
-  isLoading.dispose();
-  hasInitialized.dispose();
-  for (final n in _itemNotifiers.values) {
-    n.dispose();
-  }
-  _limit.dispose();
-  hasMore.dispose();
   super.dispose();
 }</code></pre>
 </section>
@@ -137,7 +116,7 @@ void dispose() {
 <footer>
   <span class="no-break">
     firewatch
-      1.10.1
+      1.10.2
   </span>
   
 </footer>

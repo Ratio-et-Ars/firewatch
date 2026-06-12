@@ -128,6 +128,18 @@
       id="instance-properties">
     <h2>Properties</h2>
     <dl class="properties">
+        <dt id="currentUserUid" class="property inherited">
+  <span class="name"><a href="../firewatch/FirestoreDocRepository/currentUserUid.html">currentUserUid</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span>
+  
+
+</dt>
+<dd class="inherited">
+  The current user UID (or <code>null</code> when signed out / public).
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
         <dt id="delete" class="property">
   <span class="name"><a href="../firewatch/FirestoreDocRepository/delete.html">delete</a></span>
   <span class="signature">&#8594; <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>, <span class="type-parameter">void</span>&gt;</span></span>
@@ -137,6 +149,20 @@
 <dd>
   Deletes the document.
   <div class="features"><span class="feature">late</span><span class="feature">final</span></div>
+
+</dd>
+
+        <dt id="epoch" class="property inherited">
+  <span class="name"><a href="../firewatch/FirestoreDocRepository/epoch.html">epoch</a></span>
+  <span class="signature">&#8596; <a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  Epoch counter used to discard stale async operations. Every swap/resize
+captures the current epoch and bails if it changes (a newer swap, or
+dispose, ran in the meantime).
+  <div class="features"><span class="feature">getter/setter pair</span><span class="feature">inherited</span></div>
 
 </dd>
 
@@ -174,6 +200,19 @@ and never reverts. Use this to distinguish "never loaded" from
 </dt>
 <dd class="inherited">
   Whether any listeners are currently registered.
+  <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="isAuthGated" class="property inherited">
+  <span class="name"><a href="../firewatch/FirestoreDocRepository/isAuthGated.html">isAuthGated</a></span>
+  <span class="signature">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span>
+  
+
+</dt>
+<dd class="inherited">
+  Whether this repo requires authentication. True when an auth source was
+provided; false for public/unauthenticated repos.
   <div class="features"><span class="feature">no setter</span><span class="feature">inherited</span></div>
 
 </dd>
@@ -240,6 +279,18 @@ in services that need the data before proceeding.
 
 </dd>
 
+        <dt id="sub" class="property inherited">
+  <span class="name"><a href="../firewatch/FirestoreDocRepository/sub.html">sub</a></span>
+  <span class="signature">&#8596; <a href="https://api.flutter.dev/flutter/dart-async/StreamSubscription-class.html">StreamSubscription</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Object-class.html">Object</a>?</span>&gt;</span>?</span>
+  
+
+</dt>
+<dd class="inherited">
+  The active snapshot subscription, if any.
+  <div class="features"><span class="feature">getter/setter pair</span><span class="feature">inherited</span></div>
+
+</dd>
+
         <dt id="update" class="property">
   <span class="name"><a href="../firewatch/FirestoreDocRepository/update.html">update</a></span>
   <span class="signature">&#8594; <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter">T</span>, <span class="type-parameter">void</span>&gt;</span></span>
@@ -294,6 +345,37 @@ in services that need the data before proceeding.
 </dt>
 <dd class="inherited">
   Register a closure to be called when the object changes.
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="cancelSub" class="callable inherited">
+  <span class="name"><a href="../firewatch/FirestoreDocRepository/cancelSub.html">cancelSub</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">void</span>&gt;</span></span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  Cancel the active subscription, awaiting the cancel. Used on sign-out so
+the native Firestore listener is fully torn down before the auth token is
+invalidated (otherwise the dying listener can fire <code>PERMISSION_DENIED</code>
+against the revoked token).
+  <div class="features"><span class="feature">inherited</span></div>
+
+</dd>
+
+        <dt id="cancelSubAsync" class="callable inherited">
+  <span class="name"><a href="../firewatch/FirestoreDocRepository/cancelSubAsync.html">cancelSubAsync</a></span><span class="signature">(<wbr>)
+    <span class="returntype parameter">&#8594; void</span>
+  </span>
+  
+
+</dt>
+<dd class="inherited">
+  Cancel the active subscription without blocking the hot path. Safe for
+auth/query/dependency changes where ordering with the native layer does
+not matter (the epoch guard discards any late events).
   <div class="features"><span class="feature">inherited</span></div>
 
 </dd>
@@ -535,7 +617,7 @@ Command single-execution guard.
 <footer>
   <span class="no-break">
     firewatch
-      1.10.1
+      1.10.2
   </span>
   
 </footer>

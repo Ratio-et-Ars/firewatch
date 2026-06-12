@@ -72,8 +72,8 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; setDirect(({String path, T model}) input) {
-  _guardAuth();
-  return _fs
+  guardAuth();
+  return fs
       .doc(input.path)
       .set(input.model.toJson(), SetOptions(merge: true));
 }</code></pre>
@@ -104,7 +104,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      1.10.1
+      1.10.2
   </span>
   
 </footer>
