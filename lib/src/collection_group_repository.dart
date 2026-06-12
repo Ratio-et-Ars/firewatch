@@ -310,6 +310,14 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
           },
           onError: (Object error, StackTrace stackTrace) {
             if (epoch != _epoch) return;
+            // Don't forward errors if the repo has been detached (auth-gated
+            // with null UID — e.g. user signed out). The old listener can fire
+            // PERMISSION_DENIED before its cancel reaches the native layer.
+            if (_isAuthGated && _currentUserUid == null) {
+              _cancelSubAsync();
+              isLoading.value = false;
+              return;
+            }
             isLoading.value = false;
             _onError?.call(error, stackTrace);
           },
@@ -332,23 +340,43 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
     }
   }
 
+  // Awaitable cancel — used on sign-out so the native Firestore listener is
+  // fully torn down before the auth token is invalidated.
+  Future<void> _cancelSub() async {
+    final old = _sub;
+    _sub = null;
+    if (old != null) {
+      await old.cancel();
+    }
+  }
+
   Future<void> _swap(String? uid, {bool clearExisting = true}) async {
     final epoch = ++_epoch;
 
     isLoading.value = true;
     hasInitialized.value = false;
 
-    _cancelSubAsync();
-    _modelCache.clear();
-
-    if (clearExisting) value = const [];
-
     if (_isAuthGated && uid == null) {
+      // Await cancel on sign-out so the native Firestore listener is fully
+      // torn down before the auth token is invalidated. Otherwise the still
+      // -live listener can fire PERMISSION_DENIED against the revoked token.
+      await _cancelSub();
+      _modelCache.clear();
+      // After the await, the repo may have been disposed by a registry.
+      // Guard against setting values on disposed notifiers.
+      if (epoch != _epoch) return;
+      if (clearExisting) value = const [];
       hasInitialized.value = true;
       hasMore.value = false;
       isLoading.value = false;
       return;
     }
+
+    // On the hot path (auth/query change), fire-and-forget is fine.
+    _cancelSubAsync();
+    _modelCache.clear();
+
+    if (clearExisting) value = const [];
 
     hasMore.value = true;
 
@@ -373,6 +401,14 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
         },
         onError: (Object error, StackTrace stackTrace) {
           if (epoch != _epoch) return;
+          // Don't forward errors if the repo has been detached (auth-gated
+          // with null UID — e.g. user signed out). The old listener can fire
+          // PERMISSION_DENIED before its cancel reaches the native layer.
+          if (_isAuthGated && _currentUserUid == null) {
+            _cancelSubAsync();
+            isLoading.value = false;
+            return;
+          }
           hasInitialized.value = true;
           isLoading.value = false;
           _onError?.call(error, stackTrace);
@@ -464,6 +500,7 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   // ── lifecycle ─────────────────────────────────────────────────────────────
   @override
   void dispose() {
+    ++_epoch; // prevent in-flight async ops from touching disposed notifiers
     _limit.removeListener(_resizeWindow);
     _cancelSubAsync();
     _authUid?.removeListener(_triggerRebuild);

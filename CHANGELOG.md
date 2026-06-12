@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.10.1
+
+### Fixed
+- **`FirestoreCollectionGroupRepository` safety parity** with the doc and
+  collection repos. Three guards that shipped for the sibling repos (in
+  1.5.1 and 1.8.1) were never ported to the collection-group repo:
+  - **`dispose()` now increments the epoch** before tearing down, so an
+    in-flight `_swap` (e.g. one awaiting a cache read) can no longer write
+    to the disposed notifiers. Previously this could throw
+    "A ValueNotifier was used after being disposed" or silently repopulate
+    a disposed repo.
+  - **Sign-out now awaits the listener cancel** before returning, so the
+    native Firestore listener is fully torn down before the auth token is
+    invalidated (prevents a `PERMISSION_DENIED` error loop on sign-out).
+  - **The stream `onError` callbacks now suppress errors when the repo is
+    auth-detached** (signed out), matching the collection repo, so a dying
+    listener can't surface a spurious permission error to `onError`.
+
 ## 1.10.0
 
 ### Added
