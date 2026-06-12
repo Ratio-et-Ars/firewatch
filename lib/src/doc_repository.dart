@@ -246,6 +246,12 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   }
 
   // ── public write API (require signed-in user) ─────────────────────────────
+  //
+  // The target document path is resolved from the *current* auth UID at the
+  // moment the write runs (via `docRefBuilder` + the current uid). Do not hold
+  // a write Command and replay it across an auth change: a model captured while
+  // signed in as user A, written after switching to user B, lands at B's path.
+  // Re-derive the data for the new user, or recreate the repo, on sign-in.
 
   /// Creates or merges a document with the full model.
   ///
@@ -341,6 +347,12 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   void dispose() {
     ++epoch; // prevent in-flight async ops from touching disposed notifier
     cancelSubAsync();
+    // Complete `ready` if disposed before the first load, so a pending
+    // `await repo.ready` resolves (with the current value) instead of hanging
+    // forever.
+    if (!_readyCompleter.isCompleted) {
+      _readyCompleter.complete(value);
+    }
     _authUid?.removeListener(_onAuth);
     write.dispose();
     update.dispose();

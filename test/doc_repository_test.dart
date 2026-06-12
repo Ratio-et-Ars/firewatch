@@ -288,6 +288,29 @@ void main() {
     expect(repo.value?.name, 'User1');
   });
 
+  test('ready completes (does not hang) when disposed before first load',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+    await fs.doc('foos/u1').set({'name': 'User1'});
+
+    final repo = FirestoreDocRepository<Foo>(
+      firestore: fs,
+      fromJson: Foo.fromJson,
+      docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+      authUid: authUid,
+      subscribe: true,
+    );
+
+    // Capture `ready`, then dispose before the in-flight initial swap can
+    // complete. Without completing the completer in dispose(), this future
+    // never resolves and a `await repo.ready` caller hangs forever.
+    final ready = repo.ready;
+    repo.dispose();
+
+    await expectLater(ready, completes);
+  });
+
   test('doc repo handles rapid auth changes without stale data', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>(null);
