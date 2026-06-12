@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.10.0
+
+### Added
+- **`refresh()` on `FirestoreDocRepository`.** A public method to force a
+  re-read of the document using the current auth state, mirroring the
+  existing `FirestoreCollectionRepository.refresh()`. For one-shot repos
+  (`subscribe: false`) this is how you pick up out-of-band changes (another
+  device, a Cloud Function, a webhook): call it on app resume, on
+  pull-to-refresh, or after a local write. The refetch happens **in place**,
+  keeping `value` and `hasInitialized` until fresh data arrives, so no
+  loading / uninitialized state flashes over the already-loaded document.
+
+### Fixed
+- One-shot `FirestoreDocRepository` now clears `value` when a `refresh()`
+  finds the document deleted, matching the live-listener path (previously
+  a stale value lingered).
+
 ## 1.9.0
 
 ### Added

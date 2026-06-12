@@ -96,6 +96,17 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   /// ```
   Future<T?> get ready => _readyCompleter.future;
 
+  /// Force a re-read of the document using the current auth state.
+  ///
+  /// For one-shot repos ([subscribe] is false) this is how you pick up
+  /// out-of-band changes (another device, a Cloud Function, a webhook):
+  /// call it on app resume, on pull-to-refresh, or after a local write.
+  /// The refetch happens **in place** — [value] and [hasInitialized] are
+  /// kept until fresh data arrives, so no loading / uninitialized state
+  /// flashes over the already-loaded document. For a live repo
+  /// ([subscribe] is true) it re-attaches the snapshot listener.
+  Future<void> refresh() => _swap(_currentUserUid, reset: false);
+
   String? get _currentUserUid => _authUid?.value;
 
   void _markInitialized() {
@@ -132,13 +143,21 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   }
 
   /// Attach to the correct document for the given [uid].
-  Future<void> _swap(String? uid) async {
+  ///
+  /// When [reset] is true (the default, used for auth changes) readiness
+  /// state is torn down: `hasInitialized` flips back to false and `ready`
+  /// re-waits for fresh data. A manual [refresh] passes `reset: false` to
+  /// refetch in place without flashing a loading/uninitialized state over
+  /// already-loaded data.
+  Future<void> _swap(String? uid, {bool reset = true}) async {
     final epoch = ++_epoch;
     isLoading.value = true;
 
-    // Reset readiness state so `ready` re-waits for new data.
-    hasInitialized.value = false;
-    _readyCompleter = Completer<T?>();
+    if (reset) {
+      // Reset readiness state so `ready` re-waits for new data.
+      hasInitialized.value = false;
+      _readyCompleter = Completer<T?>();
+    }
 
     // Stop previous stream
     _cancelSubAsync();
@@ -223,6 +242,11 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
             ..['parentId'] = parentIdOf(snap.reference);
           _lastData = data;
           value = _fromJson(data);
+        } else if (_lastData != null || value != null) {
+          // Doc no longer exists (e.g. deleted before a refresh) — clear it,
+          // matching the live-listener path.
+          _lastData = null;
+          value = null;
         }
       } catch (error, stackTrace) {
         if (epoch != _epoch) return;

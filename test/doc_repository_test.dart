@@ -1220,4 +1220,145 @@ void main() {
       repo.dispose();
     });
   });
+
+  group('refresh', () {
+    test('one-shot repo picks up an external write only after refresh()',
+        () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+      await fs.doc('foos/u1').set({'name': 'First'});
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: false,
+      );
+
+      await repo.ready;
+      expect(repo.value?.name, 'First');
+
+      // External change (another device, a Cloud Function, a webhook). A
+      // one-shot repo holds no listener, so it must NOT see this yet.
+      await fs.doc('foos/u1').update({'name': 'Second'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(repo.value?.name, 'First',
+          reason: 'one-shot repo must not auto-update from Firestore');
+
+      await repo.refresh();
+      expect(repo.value?.name, 'Second');
+
+      repo.dispose();
+    });
+
+    test('refresh() refetches in place without flashing hasInitialized',
+        () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+      await fs.doc('foos/u1').set({'name': 'First'});
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: false,
+      );
+
+      await repo.ready;
+      expect(repo.hasInitialized.value, isTrue);
+
+      var sawUninitialized = false;
+      void listener() {
+        if (!repo.hasInitialized.value) sawUninitialized = true;
+      }
+
+      repo.hasInitialized.addListener(listener);
+
+      await fs.doc('foos/u1').update({'name': 'Second'});
+      final pending = repo.refresh();
+      // value is held until fresh data lands — no clear-to-null flash.
+      expect(repo.value?.name, 'First');
+      await pending;
+      expect(repo.value?.name, 'Second');
+      expect(sawUninitialized, isFalse,
+          reason: 'an in-place refresh must not flip hasInitialized to false');
+
+      repo.hasInitialized.removeListener(listener);
+      repo.dispose();
+    });
+
+    test('refresh() clears value when the doc was deleted out of band',
+        () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+      await fs.doc('foos/u1').set({'name': 'First'});
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: false,
+      );
+
+      await repo.ready;
+      expect(repo.value?.name, 'First');
+
+      await fs.doc('foos/u1').delete();
+      await repo.refresh();
+      expect(repo.value, isNull);
+
+      repo.dispose();
+    });
+
+    test('refresh() is a safe no-op when signed out', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>(null);
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: false,
+      );
+
+      await repo.ready;
+      expect(repo.value, isNull);
+
+      await repo.refresh();
+      expect(repo.value, isNull);
+
+      repo.dispose();
+    });
+
+    test('refresh() on a live repo re-attaches and stays in sync', () async {
+      final fs = FakeFirebaseFirestore();
+      final authUid = ValueNotifier<String?>('u1');
+      await fs.doc('foos/u1').set({'name': 'First'});
+
+      final repo = FirestoreDocRepository<Foo>(
+        firestore: fs,
+        fromJson: Foo.fromJson,
+        docRefBuilder: (f, uid) => f.doc('foos/$uid'),
+        authUid: authUid,
+        subscribe: true,
+      );
+
+      await repo.ready;
+      expect(repo.value?.name, 'First');
+
+      await repo.refresh();
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      // Live listener still delivers updates after a manual refresh.
+      await fs.doc('foos/u1').update({'name': 'Second'});
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(repo.value?.name, 'Second');
+
+      repo.dispose();
+    });
+  });
 }
