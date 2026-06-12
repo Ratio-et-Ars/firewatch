@@ -69,6 +69,11 @@ Write commands use full document paths instead of document IDs.</p>
 <p>Works with or without authentication. Omit <code>authUid</code> for public
 collection groups that should query Firestore immediately without waiting
 for a signed-in user.</p>
+<p><strong>⚠️ Security:</strong> a collection-group query reads documents with the given
+name across <strong>every</strong> parent/tenant. This repo passes the current <code>uid</code> to
+<code>queryRefBuilder</code> but does <strong>not</strong> add any owner filter for you. Scope the
+query yourself — e.g. <code>fs.collectionGroup('tasks').where('ownerId', isEqualTo: uid)</code> — and back it with a matching collection-group security
+rule. An unfiltered builder will read other users' documents.</p>
 <p>The auth-reactive lifecycle (cache-first swap, epoch-guarded races, live
 window resizing, sign-out handling, disposal) lives in
 <code>QueryListRepositoryBase</code>, shared with <a href="../firewatch/FirestoreCollectionRepository-class.html">FirestoreCollectionRepository</a>.

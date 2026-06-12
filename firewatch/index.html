@@ -68,7 +68,8 @@
 <li>Command wrappers (<code>add</code>, <code>set</code>, <code>patch</code>, <code>update</code>, <code>delete</code>) for
 single-item CRUD operations</li>
 <li>Batch methods (<code>batchAdd</code>, <code>batchSet</code>, <code>batchPatch</code>, <code>batchUpdate</code>,
-<code>batchDelete</code>) for atomic multi-document writes via <code>WriteBatch</code></li>
+<code>batchDelete</code>) for multi-document writes via <code>WriteBatch</code> (atomic per
+500-op chunk; longer lists commit as multiple sequential batches)</li>
 </ul>
 <p>Designed to integrate with ValueNotifier and Listenable patterns for
 Flutter apps.</p>

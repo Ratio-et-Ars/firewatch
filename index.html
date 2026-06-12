@@ -110,11 +110,23 @@ class AllFriendsRepository
   AllFriendsRepository()
       : super(
           fromJson: UserProfile.fromJson,
-          queryRefBuilder: (fs, uid) =&gt; fs.collectionGroup('friends'),
+          // ⚠️ Scope by owner — see the security note below.
+          queryRefBuilder: (fs, uid) =&gt;
+              fs.collectionGroup('friends').where('ownerId', isEqualTo: uid),
           authUid: authUid,
         );
 }
 </code></pre>
+<blockquote>
+<p><strong>⚠️ Security: always scope collection-group queries by owner.</strong>
+A <code>collectionGroup('friends')</code> query reads <strong>every</strong> <code>friends</code> subcollection
+across <strong>all</strong> parents/tenants. Firewatch passes you the current <code>uid</code> but
+does <strong>not</strong> add any filter for you — an unfiltered builder like
+<code>(fs, uid) =&gt; fs.collectionGroup('friends')</code> will read other users'
+documents (subject only to your Firestore security rules). Add a
+<code>.where('ownerId', isEqualTo: uid)</code> (or equivalent) <strong>and</strong> back it with a
+matching collection-group security rule.</p>
+</blockquote>
 <hr>
 <h3 id="3-consume-in-the-ui-with-watch_it">3. Consume in the UI with <code>watch_it</code></h3>
 <p>Because repositories are <code>ValueNotifier</code>s, you can watch them directly in your widgets.</p>
@@ -200,6 +212,29 @@ await friendsRepo.patchDirect((id: 'f2', data: {'checked': false}));
 
 // Also available: addDirect, setDirect, updateDirect, deleteDirect
 </code></pre>
+<h3 id="batch-writes">Batch writes</h3>
+<p>Collection repos expose <code>batchAdd</code> / <code>batchSet</code> / <code>batchPatch</code> / <code>batchUpdate</code> /
+<code>batchDelete</code> Commands that commit via Firestore <code>WriteBatch</code>.</p>
+<blockquote>
+<p><strong>Atomicity is per chunk, not per call.</strong> A single <code>WriteBatch</code> is limited to
+500 operations, so a list longer than 500 is committed as <strong>multiple
+sequential batches</strong>. Each batch is atomic on its own, but if a later chunk
+fails, earlier chunks are already committed — the call is <strong>not</strong> all-or-
+nothing across the 500-op boundary. Keep batches ≤ 500 items if you need true
+atomicity.</p>
+</blockquote>
+<h2 id="caching--freshness">Caching &amp; freshness</h2>
+<p>Repositories are <strong>cache-first</strong>: they prime <code>value</code> from the local Firestore
+cache for instant UI, then attach the live listener (or one-shot fetch) for
+authoritative server data.</p>
+<blockquote>
+<p>One consequence: after a cache hit, <code>isLoading</code> flips to <code>false</code> and <code>value</code>
+shows the cached document <strong>before</strong> the server confirms it. If the
+subsequent server read fails (e.g. a permission change), the stale cached
+value remains on screen and the error surfaces via <code>onError</code> — it is <strong>not</strong>
+reverted. If you display sensitive data, treat an <code>onError</code> after a cache hit
+as "the shown value may be stale/unauthorized" and react accordingly.</p>
+</blockquote>
 <h2 id="error-handling">Error handling</h2>
 <p>All repositories accept an optional <code>onError</code> callback for subscription and
 fetch errors:</p>
