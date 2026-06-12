@@ -80,11 +80,22 @@ class AllFriendsRepository
   AllFriendsRepository()
       : super(
           fromJson: UserProfile.fromJson,
-          queryRefBuilder: (fs, uid) => fs.collectionGroup('friends'),
+          // ⚠️ Scope by owner — see the security note below.
+          queryRefBuilder: (fs, uid) =>
+              fs.collectionGroup('friends').where('ownerId', isEqualTo: uid),
           authUid: authUid,
         );
 }
 ```
+
+> **⚠️ Security: always scope collection-group queries by owner.**
+> A `collectionGroup('friends')` query reads **every** `friends` subcollection
+> across **all** parents/tenants. Firewatch passes you the current `uid` but
+> does **not** add any filter for you — an unfiltered builder like
+> `(fs, uid) => fs.collectionGroup('friends')` will read other users'
+> documents (subject only to your Firestore security rules). Add a
+> `.where('ownerId', isEqualTo: uid)` (or equivalent) **and** back it with a
+> matching collection-group security rule.
 
 ---
 
@@ -195,6 +206,31 @@ await friendsRepo.patchDirect((id: 'f2', data: {'checked': false}));
 
 // Also available: addDirect, setDirect, updateDirect, deleteDirect
 ```
+
+### Batch writes
+
+Collection repos expose `batchAdd` / `batchSet` / `batchPatch` / `batchUpdate` /
+`batchDelete` Commands that commit via Firestore `WriteBatch`.
+
+> **Atomicity is per chunk, not per call.** A single `WriteBatch` is limited to
+> 500 operations, so a list longer than 500 is committed as **multiple
+> sequential batches**. Each batch is atomic on its own, but if a later chunk
+> fails, earlier chunks are already committed — the call is **not** all-or-
+> nothing across the 500-op boundary. Keep batches ≤ 500 items if you need true
+> atomicity.
+
+## Caching & freshness
+
+Repositories are **cache-first**: they prime `value` from the local Firestore
+cache for instant UI, then attach the live listener (or one-shot fetch) for
+authoritative server data.
+
+> One consequence: after a cache hit, `isLoading` flips to `false` and `value`
+> shows the cached document **before** the server confirms it. If the
+> subsequent server read fails (e.g. a permission change), the stale cached
+> value remains on screen and the error surfaces via `onError` — it is **not**
+> reverted. If you display sensitive data, treat an `onError` after a cache hit
+> as "the shown value may be stale/unauthorized" and react accordingly.
 
 ## Error handling
 

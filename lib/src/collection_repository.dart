@@ -198,6 +198,12 @@ class FirestoreCollectionRepository<T extends JsonModel>
       _colOrThrow().doc(docId).delete();
 
   // ── batch operations ─────────────────────────────────────────────────────
+  //
+  // Atomicity is per chunk, not per call: a WriteBatch is capped at [batchLimit]
+  // (500) operations, so a longer list commits as multiple sequential batches.
+  // If a later chunk fails, earlier chunks are already committed — these are
+  // NOT all-or-nothing across the 500-op boundary. Keep lists <= 500 if you
+  // need true atomicity.
 
   /// The maximum number of operations per Firestore [WriteBatch].
   static const batchLimit = 500;

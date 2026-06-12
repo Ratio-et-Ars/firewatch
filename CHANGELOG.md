@@ -31,6 +31,16 @@
   document path from the **current** auth UID at write time — don't hold and
   replay a write across an auth change (a model captured as user A, written
   after switching to user B, lands at B's path).
+- **Security:** documented that collection-group queries must be scoped by
+  owner/uid (e.g. `.where('ownerId', isEqualTo: uid)`). The repo passes `uid`
+  but adds no filter itself, so an unfiltered builder reads other tenants'
+  documents (README + class doc).
+- **Batch atomicity:** documented that batch writes are atomic **per 500-op
+  chunk only** — longer lists commit as multiple sequential batches and are not
+  all-or-nothing (corrected the package overview's "atomic" wording).
+- **Caching:** documented the cache-first staleness behavior — after a cache
+  hit, a failed server read leaves the stale cached value on screen (surfaced
+  via `onError`, not reverted).
 
 ## 1.10.2
 
