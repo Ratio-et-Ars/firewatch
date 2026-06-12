@@ -136,6 +136,7 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
   /// Whether there are more documents beyond the current page.
   final ValueNotifier<bool> hasMore = ValueNotifier<bool>(true);
   bool _resizing = false;
+  bool _pendingResize = false; // a loadMore arrived mid-resize; re-run after
 
   /// Per-item notifiers kept in sync with the current list, keyed by [keyOf].
   final Map<String, ValueNotifier<T?>> _itemNotifiers = {};
@@ -206,8 +207,13 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
       _itemNotifiers.putIfAbsent(key, () => ValueNotifier<T?>(null));
 
   /// Load the next page. In realtime mode this increases the live window.
+  ///
+  /// Safe to call while a previous resize is still settling: the growth is
+  /// coalesced and applied once the in-flight resize completes, so a rapid
+  /// second tap (or a `loadMore` during an auth/dependency settle) is never
+  /// silently dropped.
   Future<void> loadMore() async {
-    if (!hasMore.value || _resizing) return;
+    if (!hasMore.value) return;
     _limit.value = _limit.value + _pageSize;
   }
 
@@ -233,7 +239,12 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
   }
 
   Future<void> _resizeWindow() async {
-    if (_resizing) return;
+    // A resize is already running; remember that the window grew again so we
+    // re-run once it finishes (instead of dropping the request).
+    if (_resizing) {
+      _pendingResize = true;
+      return;
+    }
     final uid = currentUserUid;
     if (isAuthGated && uid == null) return;
 
@@ -262,11 +273,16 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
       }
     } finally {
       _resizing = false;
+      if (_pendingResize) {
+        _pendingResize = false;
+        unawaited(_resizeWindow()); // apply the coalesced growth
+      }
     }
   }
 
   Future<void> _swap(String? uid, {bool clearExisting = true}) async {
     final ep = ++epoch;
+    _pendingResize = false; // a full reload supersedes any pending page growth
 
     isLoading.value = true;
     hasInitialized.value = false;
@@ -433,7 +449,9 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
     value = list;
     isLoading.value = false;
     hasInitialized.value = true;
-    hasMore.value = snap.docs.length >= _limit.value;
+    // Without pagination the live window doesn't apply, so there is never
+    // "more" to load — the snapshot already holds the full result set.
+    hasMore.value = _paginate && snap.docs.length >= _limit.value;
   }
 
   // ── lifecycle ─────────────────────────────────────────────────────────────

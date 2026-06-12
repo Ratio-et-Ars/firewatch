@@ -555,6 +555,46 @@ void main() {
 
     // All 10 docs returned despite pageSize: 3
     expect(repo.value.length, 10);
+    // With pagination disabled the snapshot is the full result set, so there
+    // is never "more" to load (previously hasMore was stuck true).
+    expect(repo.hasMore.value, isFalse);
+
+    repo.dispose();
+  });
+
+  test('loadMore is not dropped when called during an in-flight resize',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    for (var i = 0; i < 75; i++) {
+      await col.add({'n': i});
+    }
+
+    // One-shot mode: _resizeWindow awaits a get, so the second loadMore lands
+    // while the first resize is still in flight.
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: false,
+      pageSize: 25,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 25);
+
+    // Fire two loadMores back-to-back: the second runs while the first resize
+    // is mid-flight. The growth must be coalesced, not dropped.
+    final f1 = repo.loadMore(); // window 25 → 50, resize starts
+    final f2 = repo.loadMore(); // window 50 → 75, arrives mid-resize
+    await Future.wait([f1, f2]);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+
+    // Without coalescing, the second loadMore was dropped and we'd see 50.
+    expect(repo.value.length, 75);
 
     repo.dispose();
   });

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.10.3
+
+### Fixed
+- **`loadMore()` is no longer silently dropped** when called while a previous
+  window resize is still settling (a rapid second tap, or a `loadMore` during
+  an auth/dependency settle). The growth is now coalesced and applied once the
+  in-flight resize completes. Affects both the collection and collection-group
+  repos.
+- **`hasMore` is now `false` when `paginate: false`.** Previously a
+  non-paginated repo with more documents than `pageSize` left `hasMore` stuck
+  `true`, even though the snapshot already held the full result set and
+  `loadMore()` did nothing useful.
+
 ## 1.10.2
 
 ### Changed
