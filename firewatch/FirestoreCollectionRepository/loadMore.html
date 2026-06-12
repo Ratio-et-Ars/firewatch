@@ -63,6 +63,10 @@
     
 <section class="desc markdown">
   <p>Load the next page. In realtime mode this increases the live window.</p>
+<p>Safe to call while a previous resize is still settling: the growth is
+coalesced and applied once the in-flight resize completes, so a rapid
+second tap (or a <code>loadMore</code> during an auth/dependency settle) is never
+silently dropped.</p>
 </section>
 
 
@@ -70,7 +74,7 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; loadMore() async {
-  if (!hasMore.value || _resizing) return;
+  if (!hasMore.value) return;
   _limit.value = _limit.value + _pageSize;
 }</code></pre>
 </section>
@@ -100,7 +104,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      1.10.2
+      1.10.3
   </span>
   
 </footer>
