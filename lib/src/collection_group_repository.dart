@@ -41,6 +41,13 @@ typedef GroupPatch = ({String path, Map<String, Object?> data});
 /// collection groups that should query Firestore immediately without waiting
 /// for a signed-in user.
 ///
+/// **⚠️ Security:** a collection-group query reads documents with the given
+/// name across **every** parent/tenant. This repo passes the current `uid` to
+/// [queryRefBuilder] but does **not** add any owner filter for you. Scope the
+/// query yourself — e.g. `fs.collectionGroup('tasks').where('ownerId',
+/// isEqualTo: uid)` — and back it with a matching collection-group security
+/// rule. An unfiltered builder will read other users' documents.
+///
 /// The auth-reactive lifecycle (cache-first swap, epoch-guarded races, live
 /// window resizing, sign-out handling, disposal) lives in
 /// [QueryListRepositoryBase], shared with [FirestoreCollectionRepository].
