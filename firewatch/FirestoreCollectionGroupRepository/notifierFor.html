@@ -64,6 +64,11 @@
     
 <section class="desc markdown">
   <p>Per-item notifier (kept in sync from the results), keyed by <code>keyOf</code>.</p>
+<p>The returned notifier is a stable instance: it is seeded with the current
+cached model (if any) and keeps updating across page-window changes —
+when the item leaves the live window its value goes <code>null</code>, and when it
+re-enters the value is restored. The same instance is reused on every
+call for a given key, so a detail view can hold the reference safely.</p>
 </section>
 
 
@@ -71,7 +76,7 @@
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">ValueNotifier&lt;T?&gt; notifierFor(String key) =&gt;
-    _itemNotifiers.putIfAbsent(key, () =&gt; ValueNotifier&lt;T?&gt;(null));</code></pre>
+    _itemNotifiers.putIfAbsent(key, () =&gt; ValueNotifier&lt;T?&gt;(_modelCache[key]));</code></pre>
 </section>
 
 
