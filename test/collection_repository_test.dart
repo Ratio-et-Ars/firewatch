@@ -249,6 +249,43 @@ void main() {
     repo.dispose();
   });
 
+  test('notifierFor reference keeps updating after item leaves and re-enters',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: true,
+      pageSize: 50,
+    );
+
+    final col = fs.collection('users/u1/items');
+    await col.doc('a').set({'n': 1});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    final notifier = repo.notifierFor('a');
+    expect(notifier.value?.n, 1);
+
+    // Item leaves the result set.
+    await col.doc('a').delete();
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(notifier.value, isNull);
+
+    // Item re-enters — the SAME held notifier must update again. Previously a
+    // new instance was created on reappearance and the held reference stayed
+    // null forever (a detail view would stop updating).
+    await col.doc('a').set({'n': 2});
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(notifier.value?.n, 2);
+    expect(identical(repo.notifierFor('a'), notifier), isTrue);
+
+    repo.dispose();
+  });
+
   test('collection repo dispose removes listeners', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>('u1');

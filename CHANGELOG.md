@@ -17,6 +17,15 @@
   (with the current value) so a pending `await repo.ready` resolves instead of
   awaiting forever.
 
+- **`notifierFor(key)` now returns a stable instance** that keeps updating
+  across page-window changes. Previously, when an item left the live window its
+  per-item notifier was discarded and a *new* instance was created if the item
+  reappeared, so a detail view holding the reference silently stopped updating.
+  The notifier is now seeded from the cache, goes `null` when the item leaves
+  the window, and updates again when it re-enters. (The notifier map is also
+  bounded by the keys callers actually request — it no longer auto-creates one
+  per document.)
+
 ### Docs
 - Clarified that `FirestoreDocRepository` write Commands resolve the target
   document path from the **current** auth UID at write time — don't hold and
