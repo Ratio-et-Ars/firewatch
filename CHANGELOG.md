@@ -12,6 +12,16 @@
   non-paginated repo with more documents than `pageSize` left `hasMore` stuck
   `true`, even though the snapshot already held the full result set and
   `loadMore()` did nothing useful.
+- **`FirestoreDocRepository.ready` no longer hangs** when the repo is disposed
+  before its first load completes. `dispose()` now completes the `ready` future
+  (with the current value) so a pending `await repo.ready` resolves instead of
+  awaiting forever.
+
+### Docs
+- Clarified that `FirestoreDocRepository` write Commands resolve the target
+  document path from the **current** auth UID at write time — don't hold and
+  replay a write across an auth change (a model captured as user A, written
+  after switching to user B, lands at B's path).
 
 ## 1.10.2
 
