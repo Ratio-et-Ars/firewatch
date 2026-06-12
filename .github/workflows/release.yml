@@ -1,7 +1,15 @@
 name: Release
 
+# Tag-driven: pushing a version tag (e.g. `git tag v1.2.3 && git push origin
+# v1.2.3`) triggers BOTH this workflow (creates the GitHub Release from the
+# CHANGELOG) and publish.yml (publishes to pub.dev). The previous
+# workflow_dispatch flow created the tag with GITHUB_TOKEN, which by design
+# does NOT trigger other workflows — so publish.yml never ran. Driving both off
+# the human-pushed tag fixes that without needing a PAT.
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+*'
 
 jobs:
   release:
@@ -18,23 +26,26 @@ jobs:
       - run: flutter analyze
       - run: flutter test
 
-      - name: Read version from pubspec
-        id: version
+      - name: Verify tag matches pubspec version
         run: |
-          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          PUBSPEC_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "pubspec=$PUBSPEC_VERSION tag=$TAG_VERSION"
+          if [ "$PUBSPEC_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match pubspec version $PUBSPEC_VERSION. Bump pubspec.yaml (and CHANGELOG) before tagging."
+            exit 1
+          fi
 
       - name: Extract changelog for this version
-        id: changelog
         run: |
-          # Extract the section for the current version from CHANGELOG.md
-          awk '/^## '"${{ steps.version.outputs.version }}"'/{found=1; next} /^## /{if(found) exit} found{print}' CHANGELOG.md > release_notes.md
+          # Extract the section for the tagged version from CHANGELOG.md
+          awk '/^## '"${GITHUB_REF_NAME#v}"'/{found=1; next} /^## /{if(found) exit} found{print}' CHANGELOG.md > release_notes.md
           cat release_notes.md
 
-      - name: Create GitHub Release & tag
+      - name: Create GitHub Release
         run: |
-          gh release create "v${{ steps.version.outputs.version }}" \
-            --title "v${{ steps.version.outputs.version }}" \
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
             --notes-file release_notes.md || echo "Release already exists, skipping."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

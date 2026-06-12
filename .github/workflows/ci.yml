@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Cancel superseded runs on the same ref (e.g. rapid PR pushes).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with: { channel: stable }
+
+      - run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test (with coverage)
+        run: flutter test --coverage
+
+      - name: Enforce coverage threshold
+        env:
+          MIN_COVERAGE: "90"
+        run: |
+          if [ ! -f coverage/lcov.info ]; then
+            echo "::error::coverage/lcov.info not found"; exit 1
+          fi
+          pct=$(awk -F: '/^LF:/{lf+=$2} /^LH:/{lh+=$2} END{ if (lf==0){print "0"} else {printf "%.1f", lh*100/lf} }' coverage/lcov.info)
+          echo "Line coverage: ${pct}% (minimum ${MIN_COVERAGE}%)"
+          awk -v p="$pct" -v m="$MIN_COVERAGE" 'BEGIN{ exit !(p+0 >= m+0) }' || {
+            echo "::error::Coverage ${pct}% is below the ${MIN_COVERAGE}% threshold"; exit 1;
+          }
