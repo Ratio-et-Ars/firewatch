@@ -4,6 +4,7 @@ import 'package:command_it/command_it.dart';
 import 'package:flutter/foundation.dart';
 
 import 'json_model.dart';
+import 'query_list_repository_base.dart';
 
 /// A small, opinionated single-document repository that:
 /// 1) Reacts to auth changes (attaches/detaches via UID),
@@ -32,7 +33,8 @@ import 'json_model.dart';
 ///   subscribe: true,
 /// );
 /// ```
-class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
+class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
+    with AuthReactiveLifecycle {
   FirestoreDocRepository({
     required T Function(Map<String, dynamic>) fromJson,
     required DocumentReference<Map<String, dynamic>> Function(
@@ -51,7 +53,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
         _onError = onError,
         super(null) {
     _authUid?.addListener(_onAuth);
-    _swap(_currentUserUid);
+    _swap(currentUserUid);
   }
 
   // ── core fields ───────────────────────────────────────────────────────────
@@ -65,14 +67,12 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   final bool _subscribe;
   final FirewatchErrorHandler? _onError;
 
+  @override
+  @internal
+  AuthUidListenable? get authUidListenable => _authUid;
+
   // Last materialized data we set as [value]; used to squash metadata churn.
   Map<String, dynamic>? _lastData;
-
-  // Active subscription (if any).
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _sub;
-
-  // Epoch counter to prevent stale async operations from updating state.
-  int _epoch = 0;
 
   /// Whether the repository is currently fetching data from Firestore.
   ///
@@ -105,9 +105,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   /// kept until fresh data arrives, so no loading / uninitialized state
   /// flashes over the already-loaded document. For a live repo
   /// ([subscribe] is true) it re-attaches the snapshot listener.
-  Future<void> refresh() => _swap(_currentUserUid, reset: false);
-
-  String? get _currentUserUid => _authUid?.value;
+  Future<void> refresh() => _swap(currentUserUid, reset: false);
 
   void _markInitialized() {
     if (!hasInitialized.value) {
@@ -118,29 +116,16 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
     }
   }
 
-  /// Whether this repo requires authentication. True when [authUid] was
-  /// provided; false for public/unauthenticated collections.
-  bool get _isAuthGated => _authUid != null;
-
   // ── helpers ───────────────────────────────────────────────────────────────
   DocumentReference<Map<String, dynamic>> _docOrThrow() {
-    final uid = _currentUserUid;
-    if (_isAuthGated && uid == null) {
+    final uid = currentUserUid;
+    if (isAuthGated && uid == null) {
       throw StateError('No signed-in user; repository is detached.');
     }
     return _docRefBuilder(_fs, uid);
   }
 
-  void _onAuth() => _swap(_currentUserUid);
-
-  // Cancel without blocking the hot path.
-  void _cancelSubAsync() {
-    final old = _sub;
-    _sub = null;
-    if (old != null) {
-      unawaited(old.cancel());
-    }
-  }
+  void _onAuth() => _swap(currentUserUid);
 
   /// Attach to the correct document for the given [uid].
   ///
@@ -150,7 +135,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   /// refetch in place without flashing a loading/uninitialized state over
   /// already-loaded data.
   Future<void> _swap(String? uid, {bool reset = true}) async {
-    final epoch = ++_epoch;
+    final ep = ++epoch;
     isLoading.value = true;
 
     if (reset) {
@@ -160,9 +145,9 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
     }
 
     // Stop previous stream
-    _cancelSubAsync();
+    cancelSubAsync();
 
-    if (_isAuthGated && uid == null) {
+    if (isAuthGated && uid == null) {
       // Signed out: clear it all.
       value = null;
       _lastData = null;
@@ -176,7 +161,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
     // 1) Prime from CACHE for instant UI, if available.
     try {
       final cacheSnap = await ref.get(const GetOptions(source: Source.cache));
-      if (epoch != _epoch) return; // stale
+      if (ep != epoch) return; // stale
       if (cacheSnap.exists && cacheSnap.data() != null) {
         final data = Map<String, dynamic>.from(cacheSnap.data()!)
           ..['id'] = cacheSnap.id
@@ -187,15 +172,15 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
         _markInitialized();
       }
     } catch (_) {
-      if (epoch != _epoch) return; // stale
+      if (ep != epoch) return; // stale
       // Cache might be empty on first run; ignore.
     }
 
     if (_subscribe) {
       // 2) Live updates; include metadata but ignore metadata-only churn.
-      _sub = ref.snapshots(includeMetadataChanges: true).listen(
+      sub = ref.snapshots(includeMetadataChanges: true).listen(
         (snap) {
-          if (epoch != _epoch) return; // stale
+          if (ep != epoch) return; // stale
 
           if (!snap.exists || snap.data() == null) {
             // Document was deleted or is empty — clear value.
@@ -225,7 +210,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
           }
         },
         onError: (Object error, StackTrace stackTrace) {
-          if (epoch != _epoch) return;
+          if (ep != epoch) return;
           isLoading.value = false;
           _markInitialized();
           _onError?.call(error, stackTrace);
@@ -235,7 +220,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
       // One-shot; prefer server, fall back safely.
       try {
         final snap = await ref.get();
-        if (epoch != _epoch) return; // stale
+        if (ep != epoch) return; // stale
         if (snap.exists && snap.data() != null) {
           final data = Map<String, dynamic>.from(snap.data()!)
             ..['id'] = snap.id
@@ -249,10 +234,10 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
           value = null;
         }
       } catch (error, stackTrace) {
-        if (epoch != _epoch) return;
+        if (ep != epoch) return;
         _onError?.call(error, stackTrace);
       } finally {
-        if (epoch == _epoch) {
+        if (ep == epoch) {
           isLoading.value = false;
           _markInitialized();
         }
@@ -354,8 +339,8 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?> {
   // ── lifecycle ─────────────────────────────────────────────────────────────
   @override
   void dispose() {
-    ++_epoch; // prevent in-flight async ops from touching disposed notifier
-    _cancelSubAsync();
+    ++epoch; // prevent in-flight async ops from touching disposed notifier
+    cancelSubAsync();
     _authUid?.removeListener(_onAuth);
     write.dispose();
     update.dispose();
