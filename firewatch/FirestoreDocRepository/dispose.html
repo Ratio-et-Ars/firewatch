@@ -84,6 +84,12 @@ listeners or not immediately before disposal.</p>
 void dispose() {
   ++epoch; &#47;&#47; prevent in-flight async ops from touching disposed notifier
   cancelSubAsync();
+  &#47;&#47; Complete `ready` if disposed before the first load, so a pending
+  &#47;&#47; `await repo.ready` resolves (with the current value) instead of hanging
+  &#47;&#47; forever.
+  if (!_readyCompleter.isCompleted) {
+    _readyCompleter.complete(value);
+  }
   _authUid?.removeListener(_onAuth);
   write.dispose();
   update.dispose();
