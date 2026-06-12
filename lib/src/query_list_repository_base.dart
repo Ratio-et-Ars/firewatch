@@ -203,8 +203,14 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
   Future<void> refresh() => _swap(currentUserUid, clearExisting: true);
 
   /// Per-item notifier (kept in sync from the results), keyed by [keyOf].
+  ///
+  /// The returned notifier is a stable instance: it is seeded with the current
+  /// cached model (if any) and keeps updating across page-window changes —
+  /// when the item leaves the live window its value goes `null`, and when it
+  /// re-enters the value is restored. The same instance is reused on every
+  /// call for a given key, so a detail view can hold the reference safely.
   ValueNotifier<T?> notifierFor(String key) =>
-      _itemNotifiers.putIfAbsent(key, () => ValueNotifier<T?>(null));
+      _itemNotifiers.putIfAbsent(key, () => ValueNotifier<T?>(_modelCache[key]));
 
   /// Load the next page. In realtime mode this increases the live window.
   ///
@@ -432,18 +438,21 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
         _modelCache[key] = m;
         list.add(m);
       }
-      _itemNotifiers.putIfAbsent(key, () => ValueNotifier<T?>(null)).value =
-          _modelCache[key];
+      // Only update notifiers a caller actually requested via notifierFor.
+      // (We don't auto-create one per document — that would grow unboundedly
+      // and the map is what we hand back to detail views.)
+      _itemNotifiers[key]?.value = _modelCache[key];
     }
 
-    // Prune notifiers for documents no longer in the snapshot to prevent
-    // unbounded growth of _itemNotifiers over long sessions.
-    _itemNotifiers.removeWhere((key, notifier) {
+    // Null out (but keep) notifiers for documents no longer in the snapshot.
+    // Keeping the instance means a detail view holding the reference resumes
+    // updating if the document re-enters the window. The map is bounded by the
+    // number of distinct keys callers requested, so this does not grow with
+    // the data set.
+    _itemNotifiers.forEach((key, notifier) {
       if (!activeKeys.contains(key)) {
         notifier.value = null;
-        return true;
       }
-      return false;
     });
 
     value = list;
