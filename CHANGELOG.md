@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.11.0
+
+### Changed
+- **`refresh()` is now a soft refresh.** It no longer clears `value` or resets
+  `hasInitialized` to `false` while the re-fetch is in flight. The already-loaded
+  list stays visible (and `isRefreshing` is `true`, `isInitializing` stays
+  `false`) so pull-to-refresh UIs keep showing existing items under the spinner
+  instead of flashing a blank list / empty-state on every pull. Cold loads are
+  unaffected — with nothing loaded yet there is nothing to preserve, so the
+  first results simply populate `value`. The internal `_swap` gained a
+  `preserveInitialized` flag to support this; `setQuery`, auth/dependency
+  changes, and the initial `start()` still do a hard (clearing) swap.
+
 ## 1.10.3
 
 ### Fixed
