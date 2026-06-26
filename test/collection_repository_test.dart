@@ -534,6 +534,48 @@ void main() {
     repo.dispose();
   });
 
+  test('refresh keeps value + hasInitialized (soft refresh, isRefreshing)',
+      () async {
+    final fs = FakeFirebaseFirestore();
+    final authUid = ValueNotifier<String?>('u1');
+
+    final col = fs.collection('users/u1/items');
+    await col.add({'n': 1});
+
+    final repo = FirestoreCollectionRepository<Item>(
+      firestore: fs,
+      fromJson: Item.fromJson,
+      colRefBuilder: (f, uid) => f.collection('users/$uid/items'),
+      authUid: authUid,
+      subscribe: false, // one-shot, like the HiveBloom inspection/notes repos
+      pageSize: 50,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(repo.value.length, 1);
+    expect(repo.hasInitialized.value, isTrue);
+
+    // Kick off a refresh but DON'T await it — inspect state mid-flight.
+    final pending = repo.refresh();
+
+    // Soft refresh: the already-loaded list stays visible and the repo still
+    // reports as initialized, so a pull-to-refresh UI keeps rendering items
+    // (and the spinner) instead of flashing blank / empty-state.
+    expect(repo.value.length, 1, reason: 'value must not be cleared on refresh');
+    expect(repo.hasInitialized.value, isTrue,
+        reason: 'hasInitialized must stay true during a refresh');
+    expect(repo.isInitializing, isFalse);
+    expect(repo.isRefreshing, isTrue);
+
+    await pending;
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+
+    expect(repo.value.length, 1);
+    expect(repo.isRefreshing, isFalse);
+
+    repo.dispose();
+  });
+
   test('collection repo resetPages resets to first page', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>('u1');

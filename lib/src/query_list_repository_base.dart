@@ -199,8 +199,20 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
     _queryNotifier.value = qb; // listener triggers _swap
   }
 
-  /// Force a re-attach / refetch using current auth, deps, and query.
-  Future<void> refresh() => _swap(currentUserUid, clearExisting: true);
+  /// Re-fetch using current auth, deps, and query, keeping the already-loaded
+  /// list visible while the fetch is in flight.
+  ///
+  /// This is a *soft* refresh: it does NOT clear [value] and does NOT reset
+  /// [hasInitialized] back to `false`. While the fetch runs, [isLoading] is
+  /// `true` and — because the repo is already initialized — [isRefreshing] is
+  /// `true` (and [isInitializing] stays `false`). Pull-to-refresh UIs can keep
+  /// rendering the existing items (and a spinner) instead of flashing a blank
+  /// list or an empty-state on every pull.
+  ///
+  /// On a repo that has never loaded (cold), this behaves like a cold load:
+  /// there's nothing to preserve, so the first results simply populate [value].
+  Future<void> refresh() =>
+      _swap(currentUserUid, clearExisting: false, preserveInitialized: true);
 
   /// Per-item notifier (kept in sync from the results), keyed by [keyOf].
   ///
@@ -286,12 +298,19 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
     }
   }
 
-  Future<void> _swap(String? uid, {bool clearExisting = true}) async {
+  Future<void> _swap(
+    String? uid, {
+    bool clearExisting = true,
+    bool preserveInitialized = false,
+  }) async {
     final ep = ++epoch;
     _pendingResize = false; // a full reload supersedes any pending page growth
 
     isLoading.value = true;
-    hasInitialized.value = false;
+    // A soft refresh of already-loaded data keeps [hasInitialized] true so
+    // consumers can distinguish a cold load (isInitializing) from a refresh
+    // (isRefreshing) and keep showing existing content under the spinner.
+    if (!preserveInitialized) hasInitialized.value = false;
 
     if (isAuthGated && uid == null) {
       // Await cancel on sign-out so the native Firestore listener is fully
