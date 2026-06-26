@@ -62,14 +62,24 @@
     </section>
     
 <section class="desc markdown">
-  <p>Force a re-attach / refetch using current auth, deps, and query.</p>
+  <p>Re-fetch using current auth, deps, and query, keeping the already-loaded
+list visible while the fetch is in flight.</p>
+<p>This is a <em>soft</em> refresh: it does NOT clear <a href="https://api.flutter.dev/flutter/foundation/ValueNotifier/value.html">value</a> and does NOT reset
+<code>hasInitialized</code> back to <code>false</code>. While the fetch runs, <code>isLoading</code> is
+<code>true</code> and — because the repo is already initialized — <code>isRefreshing</code> is
+<code>true</code> (and <code>isInitializing</code> stays <code>false</code>). Pull-to-refresh UIs can keep
+rendering the existing items (and a spinner) instead of flashing a blank
+list or an empty-state on every pull.</p>
+<p>On a repo that has never loaded (cold), this behaves like a cold load:
+there's nothing to preserve, so the first results simply populate <a href="https://api.flutter.dev/flutter/foundation/ValueNotifier/value.html">value</a>.</p>
 </section>
 
 
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; refresh() =&gt; _swap(currentUserUid, clearExisting: true);</code></pre>
+  <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; refresh() =&gt;
+    _swap(currentUserUid, clearExisting: false, preserveInitialized: true);</code></pre>
 </section>
 
 
@@ -97,7 +107,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      1.10.3
+      1.11.0
   </span>
   
 </footer>

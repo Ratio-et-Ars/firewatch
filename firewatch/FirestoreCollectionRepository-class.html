@@ -105,7 +105,7 @@ writes (<code>add</code>, batch operations) and keys items by document ID.</p>
     <h2>Constructors</h2>
     <dl class="constructor-summary-list">
         <dt id="FirestoreCollectionRepository.new" class="callable">
-          <span class="name"><a href="../firewatch/FirestoreCollectionRepository/FirestoreCollectionRepository.html">FirestoreCollectionRepository</a></span><span class="signature">({<span class="parameter" id="param-fromJson"><span>required</span> <span class="type-annotation">T</span> <span class="parameter-name">fromJson</span>(<span class="parameter" id="param-"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span></span>), </span><span class="parameter" id="param-colRefBuilder"><span>required</span> <span class="type-annotation"><a href="../firewatch/ColRefBuilder.html">ColRefBuilder</a></span> <span class="parameter-name">colRefBuilder</span>, </span><span class="parameter" id="param-firestore"><span class="type-annotation"><a href="https://pub.dev/documentation/cloud_firestore/6.5.0/cloud_firestore/FirebaseFirestore-class.html">FirebaseFirestore</a>?</span> <span class="parameter-name">firestore</span>, </span><span class="parameter" id="param-queryBuilder"><span class="type-annotation"><a href="../firewatch/QueryMutator.html">QueryMutator</a>?</span> <span class="parameter-name">queryBuilder</span>, </span><span class="parameter" id="param-authUid"><span class="type-annotation"><a href="../firewatch/AuthUidListenable.html">AuthUidListenable</a>?</span> <span class="parameter-name">authUid</span>, </span><span class="parameter" id="param-dependencies"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/foundation/Listenable-class.html">Listenable</a></span>&gt;</span></span> <span class="parameter-name">dependencies</span> = <span class="default-value">const []</span>, </span><span class="parameter" id="param-subscribe"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">subscribe</span> = <span class="default-value">true</span>, </span><span class="parameter" id="param-pageSize"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">pageSize</span> = <span class="default-value">25</span>, </span><span class="parameter" id="param-paginate"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">paginate</span> = <span class="default-value">true</span>, </span><span class="parameter" id="param-onError"><span class="type-annotation"><a href="../firewatch/FirewatchErrorHandler.html">FirewatchErrorHandler</a>?</span> <span class="parameter-name">onError</span>, </span><span class="parameter" id="param-maxRetries"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">maxRetries</span> = <span class="default-value">5</span>, </span><span class="parameter" id="param-retryDelay"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a></span> <span class="parameter-name">retryDelay</span> = <span class="default-value">const Duration(milliseconds: 500)</span></span>})</span>
+          <span class="name"><a href="../firewatch/FirestoreCollectionRepository/FirestoreCollectionRepository.html">FirestoreCollectionRepository</a></span><span class="signature">({<span class="parameter" id="param-fromJson"><span>required</span> <span class="type-annotation">T</span> <span class="parameter-name">fromJson</span>(<span class="parameter" id="param-"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span></span>), </span><span class="parameter" id="param-colRefBuilder"><span>required</span> <span class="type-annotation"><a href="../firewatch/ColRefBuilder.html">ColRefBuilder</a></span> <span class="parameter-name">colRefBuilder</span>, </span><span class="parameter" id="param-firestore"><span class="type-annotation"><a href="https://pub.dev/documentation/cloud_firestore/6.6.0/cloud_firestore/FirebaseFirestore-class.html">FirebaseFirestore</a>?</span> <span class="parameter-name">firestore</span>, </span><span class="parameter" id="param-queryBuilder"><span class="type-annotation"><a href="../firewatch/QueryMutator.html">QueryMutator</a>?</span> <span class="parameter-name">queryBuilder</span>, </span><span class="parameter" id="param-authUid"><span class="type-annotation"><a href="../firewatch/AuthUidListenable.html">AuthUidListenable</a>?</span> <span class="parameter-name">authUid</span>, </span><span class="parameter" id="param-dependencies"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/foundation/Listenable-class.html">Listenable</a></span>&gt;</span></span> <span class="parameter-name">dependencies</span> = <span class="default-value">const []</span>, </span><span class="parameter" id="param-subscribe"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">subscribe</span> = <span class="default-value">true</span>, </span><span class="parameter" id="param-pageSize"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">pageSize</span> = <span class="default-value">25</span>, </span><span class="parameter" id="param-paginate"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">paginate</span> = <span class="default-value">true</span>, </span><span class="parameter" id="param-onError"><span class="type-annotation"><a href="../firewatch/FirewatchErrorHandler.html">FirewatchErrorHandler</a>?</span> <span class="parameter-name">onError</span>, </span><span class="parameter" id="param-maxRetries"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">maxRetries</span> = <span class="default-value">5</span>, </span><span class="parameter" id="param-retryDelay"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a></span> <span class="parameter-name">retryDelay</span> = <span class="default-value">const Duration(milliseconds: 500)</span></span>})</span>
         </dt>
         <dd>
           Creates a new <a href="../firewatch/FirestoreCollectionRepository-class.html">FirestoreCollectionRepository</a>.
@@ -230,7 +230,7 @@ dispose, ran in the meantime).
 
         <dt id="fs" class="property inherited">
   <span class="name"><a href="../firewatch/FirestoreCollectionRepository/fs.html">fs</a></span>
-  <span class="signature">&#8594; <a href="https://pub.dev/documentation/cloud_firestore/6.5.0/cloud_firestore/FirebaseFirestore-class.html">FirebaseFirestore</a></span>
+  <span class="signature">&#8594; <a href="https://pub.dev/documentation/cloud_firestore/6.6.0/cloud_firestore/FirebaseFirestore-class.html">FirebaseFirestore</a></span>
   
 
 </dt>
@@ -546,7 +546,7 @@ their own Commands and then call <code>super.dispose()</code>.
 </dd>
 
         <dt id="keyOf" class="callable">
-  <span class="name"><a href="../firewatch/FirestoreCollectionRepository/keyOf.html">keyOf</a></span><span class="signature">(<wbr><span class="parameter" id="keyOf-param-doc"><span class="type-annotation"><a href="https://pub.dev/documentation/cloud_firestore/6.5.0/cloud_firestore/DocumentSnapshot-class.html">DocumentSnapshot</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span>&gt;</span></span> <span class="parameter-name">doc</span></span>)
+  <span class="name"><a href="../firewatch/FirestoreCollectionRepository/keyOf.html">keyOf</a></span><span class="signature">(<wbr><span class="parameter" id="keyOf-param-doc"><span class="type-annotation"><a href="https://pub.dev/documentation/cloud_firestore/6.6.0/cloud_firestore/DocumentSnapshot-class.html">DocumentSnapshot</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span>&gt;</span></span> <span class="parameter-name">doc</span></span>)
     <span class="returntype parameter">&#8594; <a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>
   </span>
   
@@ -649,7 +649,7 @@ is possible to uninstall the <code>handler</code> from the <code>handler</code> 
 
         <dt id="queryBase" class="callable">
   <span class="name"><a href="../firewatch/FirestoreCollectionRepository/queryBase.html">queryBase</a></span><span class="signature">(<wbr><span class="parameter" id="queryBase-param-uid"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a>?</span> <span class="parameter-name">uid</span></span>)
-    <span class="returntype parameter">&#8594; <a href="https://pub.dev/documentation/cloud_firestore/6.5.0/cloud_firestore/Query-class.html">Query</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span>&gt;</span></span>
+    <span class="returntype parameter">&#8594; <a href="https://pub.dev/documentation/cloud_firestore/6.6.0/cloud_firestore/Query-class.html">Query</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Map-class.html">Map</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/String-class.html">String</a></span>, <span class="type-parameter">dynamic</span>&gt;</span></span>&gt;</span></span>
   </span>
   
 
@@ -669,7 +669,8 @@ for the given <code>uid</code>.
 
 </dt>
 <dd class="inherited">
-  Force a re-attach / refetch using current auth, deps, and query.
+  Re-fetch using current auth, deps, and query, keeping the already-loaded
+list visible while the fetch is in flight.
   <div class="features"><span class="feature">inherited</span></div>
 
 </dd>
@@ -804,7 +805,7 @@ constructor (after their own fields are initialized).
 
 </dt>
 <dd>
-  The maximum number of operations per Firestore <a href="https://pub.dev/documentation/cloud_firestore/6.5.0/cloud_firestore/WriteBatch-class.html">WriteBatch</a>.
+  The maximum number of operations per Firestore <a href="https://pub.dev/documentation/cloud_firestore/6.6.0/cloud_firestore/WriteBatch-class.html">WriteBatch</a>.
   
 
 </dd>
@@ -834,7 +835,7 @@ constructor (after their own fields are initialized).
 <footer>
   <span class="no-break">
     firewatch
-      1.10.3
+      1.11.0
   </span>
   
 </footer>
