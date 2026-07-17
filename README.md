@@ -249,7 +249,7 @@ final repo = FirestoreCollectionRepository<Item>(
 
 | Error source | How it surfaces |
 |---|---|
-| Snapshot listener / one-shot fetch | `onError` callback |
+| Snapshot listener / one-shot fetch | `onError` callback (every attempt) + `lastError` notifier (terminal, after retries) |
 | Command-based writes | `command.errors` ValueNotifier |
 | Direct writes (`*Direct`) | Exception on the returned Future |
 | Auth guard (no signed-in user) | Synchronous `StateError` |
@@ -258,6 +258,8 @@ final repo = FirestoreCollectionRepository<Item>(
 
 - `isLoading`: true while fetching/refreshing
 - `hasInitialized` (collections): first load completed
+- `lastError` / `hasError` (collections): last terminal fetch error, or `null` — lets you tell "load failed" apart from "genuinely empty" (`showEmpty` checks it for you)
+- `isFromCache` (collections): whether the latest snapshot came from the local cache (`metadata.isFromCache`) rather than the server — with persistence enabled, an offline fetch can resolve as a cached (possibly empty) snapshot instead of erroring
 - `hasMore` (collections): whether `loadMore()` can grow the window
 - `notifierFor(docId)`: get a pre-soaked `ValueNotifier<T?>` for a specific item (keyed by doc path for collection groups)
 

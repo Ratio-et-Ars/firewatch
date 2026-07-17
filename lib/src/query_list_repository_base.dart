@@ -150,16 +150,44 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
   /// Whether the repository has completed its first query.
   final ValueNotifier<bool> hasInitialized = ValueNotifier<bool>(false);
 
+  /// The last terminal fetch error, or `null` when the most recent fetch
+  /// succeeded (or none has completed yet).
+  ///
+  /// Set when a fetch fails after exhausting the retry budget — both the
+  /// one-shot path (`subscribe: false`) and the snapshot-listener path. Cleared
+  /// by any successful snapshot, and on a hard query/auth/dependency swap.
+  ///
+  /// This is what lets a consumer distinguish "initialized but the fetch
+  /// FAILED" (value is `[]`, [lastError] non-null) from "initialized and
+  /// genuinely empty" (value is `[]`, [lastError] null). Widgets that gate an
+  /// empty-state CTA on [hasInitialized] should also check [hasError] — see
+  /// [showEmpty], which does this for you.
+  final ValueNotifier<Object?> lastError = ValueNotifier<Object?>(null);
+
+  /// `true` when the most recent fetch ended in a terminal error.
+  bool get hasError => lastError.value != null;
+
+  /// Whether the most recent snapshot was served from the local cache rather
+  /// than confirmed by the server (`snapshot.metadata.isFromCache`).
+  ///
+  /// With Firestore persistence enabled (notably on web), an offline or flaky
+  /// `get()` can RESOLVE from cache instead of throwing — including a
+  /// cached-empty result. This lets consumers distinguish "server-confirmed
+  /// empty" from "cached/unknown empty" when that distinction matters.
+  final ValueNotifier<bool> isFromCache = ValueNotifier<bool>(false);
+
   /// `true` when the first query has not yet completed.
   bool get isInitializing => !hasInitialized.value && isLoading.value;
 
   /// `true` when a subsequent fetch is in progress after initial load.
   bool get isRefreshing => hasInitialized.value && isLoading.value;
 
-  /// `true` when initialization is complete, loading is done, and the list is
-  /// empty.
+  /// `true` when initialization is complete, loading is done, the list is
+  /// empty, and the emptiness is genuine (the fetch did not fail — see
+  /// [lastError]). A failed fetch leaves `value` empty too; without the error
+  /// check an "add your first item" CTA would show over a load failure.
   bool get showEmpty =>
-      hasInitialized.value && !isLoading.value && value.isEmpty;
+      hasInitialized.value && !isLoading.value && value.isEmpty && !hasError;
 
   @override
   @internal
@@ -320,6 +348,7 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
       // After the await, the repo may have been disposed by a registry.
       if (ep != epoch) return;
       if (clearExisting) value = const [];
+      lastError.value = null; // detached repo is genuinely empty, not failed
       hasInitialized.value = true;
       hasMore.value = false;
       isLoading.value = false;
@@ -330,7 +359,13 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
     cancelSubAsync();
     _modelCache.clear();
 
-    if (clearExisting) value = const [];
+    if (clearExisting) {
+      value = const [];
+      // A hard swap is a new query context (auth/dep/query change); a stale
+      // error from the previous context shouldn't leak into it. Soft refreshes
+      // keep the error until a snapshot actually succeeds.
+      lastError.value = null;
+    }
 
     hasMore.value = true;
 
@@ -395,6 +430,9 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
         }
       });
     } else {
+      // Terminal failure: surface the error so consumers can tell "failed"
+      // apart from "genuinely empty" (see [lastError] / [showEmpty]).
+      lastError.value = error;
       hasInitialized.value = true;
       isLoading.value = false;
     }
@@ -405,6 +443,7 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
       final uid = currentUserUid;
       if (isAuthGated && uid == null) {
         if (ep != epoch) return;
+        isLoading.value = false;
         hasInitialized.value = true;
         return;
       }
@@ -414,17 +453,37 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
       _handleSnap(snap);
     } catch (error, stackTrace) {
       if (ep != epoch) return;
-      _onError?.call(error, stackTrace);
-    } finally {
-      if (ep == epoch) {
+      // Mirror _onStreamError: never surface errors from a detached repo (the
+      // fetch can lose the race against a sign-out).
+      if (isAuthGated && currentUserUid == null) {
         isLoading.value = false;
-        hasInitialized.value = true;
+        return;
       }
+
+      _onError?.call(error, stackTrace);
+
+      // Honor the same retry budget/backoff as the snapshot-listener path.
+      if (_retryCount < _maxRetries) {
+        _retryCount++;
+        await Future<void>.delayed(_retryDelay * _retryCount);
+        // Abandon if a newer swap/resize/dispose superseded us mid-backoff.
+        if (ep != epoch) return;
+        return _fetchOneShotEpoch(ep);
+      }
+
+      // Budget exhausted: mark initialized (the first query DID complete —
+      // unsuccessfully) and surface the error so `value == []` here is
+      // distinguishable from a genuine empty result.
+      lastError.value = error;
+      isLoading.value = false;
+      hasInitialized.value = true;
     }
   }
 
   void _handleSnap(QuerySnapshot<Map<String, dynamic>> snap) {
     _retryCount = 0; // successful snapshot → reset retry counter
+    lastError.value = null; // fresh data supersedes any prior failure
+    isFromCache.value = snap.metadata.isFromCache;
     // Incremental: only re-parse changed documents, keyed by keyOf.
     for (final change in snap.docChanges) {
       final doc = change.doc;
@@ -500,6 +559,8 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
     _queryNotifier.dispose();
     isLoading.dispose();
     hasInitialized.dispose();
+    lastError.dispose();
+    isFromCache.dispose();
     for (final n in _itemNotifiers.values) {
       n.dispose();
     }
