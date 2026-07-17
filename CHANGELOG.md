@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.12.0
+
+### Added
+- **`lastError` / `hasError` on list repositories.** Collection and
+  collection-group repos now expose `ValueNotifier<Object?> lastError`
+  (and a `hasError` convenience getter), set when a fetch fails after
+  exhausting the retry budget — on both the one-shot (`subscribe: false`)
+  and snapshot-listener paths. It is cleared by any successful snapshot and
+  on hard query/auth/dependency swaps. This makes "initialized but the fetch
+  FAILED" (`value == []`, `lastError != null`) distinguishable from
+  "initialized and genuinely empty", so UIs stop rendering "add your first
+  item" empty states over load failures (Ratio-et-Ars/hivebloom#1202).
+- **`isFromCache` on list repositories.** Mirrors the latest snapshot's
+  `metadata.isFromCache`. With Firestore persistence enabled (notably on
+  web), an offline `get()` can resolve from cache — including a cached-empty
+  result — so this lets consumers distinguish "server-confirmed empty" from
+  "cached/unknown empty".
+
+### Fixed
+- **One-shot fetches now honor `maxRetries`/`retryDelay`.** Previously the
+  retry budget was only consulted by the snapshot-listener error path; a
+  `subscribe: false` repo gave up on the first `.get()` failure and — worse —
+  still flipped `hasInitialized` to `true` over an empty `value`, making a
+  failed fetch look exactly like a successful empty one. The one-shot path
+  now retries with the same linear backoff and epoch-guard discipline as the
+  listener path (retries are abandoned if the repo is swapped or disposed
+  mid-backoff), and only surfaces `lastError` once the budget is exhausted.
+
+### Changed
+- **`showEmpty` now also requires `!hasError`.** A failed fetch leaves the
+  list empty too; `showEmpty` no longer reports `true` for it.
+
 ## 1.11.0
 
 ### Changed
