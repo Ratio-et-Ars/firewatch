@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
-  <meta name="description" content="API docs for the batchPatch property from the FirestoreCollectionRepository class, for the Dart programming language.">
-  <title>batchPatch property - FirestoreCollectionRepository class - firewatch library - Dart API</title>
+  <meta name="description" content="API docs for the lastError property from the FirestoreCollectionGroupRepository class, for the Dart programming language.">
+  <title>lastError property - FirestoreCollectionGroupRepository class - firewatch library - Dart API</title>
 
 
   
@@ -26,10 +26,10 @@
   <ol class="breadcrumbs gt-separated dark hidden-xs">
     <li><a href="../../index.html">firewatch</a></li>
     <li><a href="../../firewatch/">firewatch.dart</a></li>
-    <li><a href="../../firewatch/FirestoreCollectionRepository-class.html">FirestoreCollectionRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
-    <li class="self-crumb">batchPatch property</li>
+    <li><a href="../../firewatch/FirestoreCollectionGroupRepository-class.html">FirestoreCollectionGroupRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
+    <li class="self-crumb">lastError property</li>
   </ol>
-  <div class="self-name">batchPatch</div>
+  <div class="self-name">lastError</div>
   <form class="search navbar-right" role="search">
     <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
   </form>
@@ -46,43 +46,38 @@
 <div
     id="dartdoc-main-content"
     class="main-content"
-    data-above-sidebar="firewatch&#47;FirestoreCollectionRepository-class-sidebar.html"
+    data-above-sidebar="firewatch&#47;FirestoreCollectionGroupRepository-class-sidebar.html"
     data-below-sidebar="">
     <div>
-<h1><span class="kind-property">batchPatch</span> property 
+<h1><span class="kind-property">lastError</span> property 
 </h1></div>
 
     
       <section class="multi-line-signature">
         
-        <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/List-class.html">List</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="../../firewatch/Patch.html">Patch</a></span>&gt;</span></span>, <span class="type-parameter">void</span>&gt;</span>
-        <span class="name ">batchPatch</span>
-        <div class="features"><span class="feature">late</span><span class="feature">final</span></div>
+        <a href="https://api.flutter.dev/flutter/foundation/ValueNotifier-class.html">ValueNotifier</a><span class="signature">&lt;<wbr><span class="type-parameter"><a href="https://api.flutter.dev/flutter/dart-core/Object-class.html">Object</a>?</span>&gt;</span>
+        <span class="name ">lastError</span>
+        <div class="features"><span class="feature">final</span><span class="feature">inherited</span></div>
 
       </section>
       
 <section class="desc markdown">
-  <p>Partially updates multiple documents in a single batched write.</p>
-<p>Each <a href="../../firewatch/Patch.html">Patch</a> contains a document <code>id</code> and a <code>data</code> map of fields
-to update. Only the specified fields are modified; other fields are
-untouched. Matches the behaviour of the single-item <a href="../../firewatch/FirestoreCollectionRepository/patch.html">patch</a> command.</p>
-<p>This is a <a href="https://pub.dev/documentation/command_it/9.5.1/command_it/Command-class.html">Command</a>, so it exposes <code>isRunning</code>, <code>errors</code>, and can be
-awaited via <code>runAsync</code>. Lists exceeding <a href="../../firewatch/FirestoreCollectionRepository/batchLimit-constant.html">batchLimit</a> (500) are
-automatically split into sequential batches.</p>
-<p>Example:</p>
-<pre class="language-dart"><code class="language-dart">await repo.batchPatch.runAsync([
-  (id: 'u1', data: {'name': 'Alice'}),
-  (id: 'u2', data: {'name': 'Bob'}),
-]);
-</code></pre>
+  <p>The last terminal fetch error, or <code>null</code> when the most recent fetch
+succeeded (or none has completed yet).</p>
+<p>Set when a fetch fails after exhausting the retry budget — both the
+one-shot path (<code>subscribe: false</code>) and the snapshot-listener path. Cleared
+by any successful snapshot, and on a hard query/auth/dependency swap.</p>
+<p>This is what lets a consumer distinguish "initialized but the fetch
+FAILED" (value is <code>[]</code>, <code>lastError</code> non-null) from "initialized and
+genuinely empty" (value is <code>[]</code>, <code>lastError</code> null). Widgets that gate an
+empty-state CTA on <code>hasInitialized</code> should also check <code>hasError</code> — see
+<code>showEmpty</code>, which does this for you.</p>
 </section>
 
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final batchPatch = Command.createAsyncNoResult&lt;List&lt;Patch&gt;&gt;(
-  (patches) =&gt; _runBatched(patches, (batch, col, p) =&gt; batch.update(col.doc(p.id), p.data)),
-);</code></pre>
+  <pre class="language-dart"><code class="language-dart">final ValueNotifier&lt;Object?&gt; lastError = ValueNotifier&lt;Object?&gt;(null);</code></pre>
 </section>
 
 
@@ -98,11 +93,11 @@ automatically split into sequential batches.</p>
 <ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
     <li><a href="../../index.html">firewatch</a></li>
     <li><a href="../../firewatch/">firewatch</a></li>
-    <li><a href="../../firewatch/FirestoreCollectionRepository-class.html">FirestoreCollectionRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
-    <li class="self-crumb">batchPatch property</li>
+    <li><a href="../../firewatch/FirestoreCollectionGroupRepository-class.html">FirestoreCollectionGroupRepository<span class="signature">&lt;<wbr><span class="type-parameter">T extends JsonModel</span>&gt;</span></a></li>
+    <li class="self-crumb">lastError property</li>
 </ol>
 
-  <h5>FirestoreCollectionRepository class</h5>
+  <h5>FirestoreCollectionGroupRepository class</h5>
   <div id="dartdoc-sidebar-left-content"></div>
 </div><!--/.sidebar-offcanvas-->
 <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">

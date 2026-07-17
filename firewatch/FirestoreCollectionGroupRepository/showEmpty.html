@@ -67,15 +67,17 @@
     </section>
     
 <section class="desc markdown">
-  <p><code>true</code> when initialization is complete, loading is done, and the list is
-empty.</p>
+  <p><code>true</code> when initialization is complete, loading is done, the list is
+empty, and the emptiness is genuine (the fetch did not fail — see
+<code>lastError</code>). A failed fetch leaves <code>value</code> empty too; without the error
+check an "add your first item" CTA would show over a load failure.</p>
 </section>
 
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">bool get showEmpty =&gt;
-    hasInitialized.value &amp;&amp; !isLoading.value &amp;&amp; value.isEmpty;</code></pre>
+    hasInitialized.value &amp;&amp; !isLoading.value &amp;&amp; value.isEmpty &amp;&amp; !hasError;</code></pre>
 </section>
 
   </section>
@@ -105,7 +107,7 @@ empty.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.11.0
+      1.12.0
   </span>
   
 </footer>

@@ -256,7 +256,7 @@ fetch errors:</p>
 <tbody>
 <tr>
 <td>Snapshot listener / one-shot fetch</td>
-<td><code>onError</code> callback</td>
+<td><code>onError</code> callback (every attempt) + <code>lastError</code> notifier (terminal, after retries)</td>
 </tr>
 <tr>
 <td>Command-based writes</td>
@@ -276,6 +276,8 @@ fetch errors:</p>
 <ul>
 <li><code>isLoading</code>: true while fetching/refreshing</li>
 <li><code>hasInitialized</code> (collections): first load completed</li>
+<li><code>lastError</code> / <code>hasError</code> (collections): last terminal fetch error, or <code>null</code> — lets you tell "load failed" apart from "genuinely empty" (<code>showEmpty</code> checks it for you)</li>
+<li><code>isFromCache</code> (collections): whether the latest snapshot came from the local cache (<code>metadata.isFromCache</code>) rather than the server — with persistence enabled, an offline fetch can resolve as a cached (possibly empty) snapshot instead of erroring</li>
 <li><code>hasMore</code> (collections): whether <code>loadMore()</code> can grow the window</li>
 <li><code>notifierFor(docId)</code>: get a pre-soaked <code>ValueNotifier&lt;T?&gt;</code> for a specific item (keyed by doc path for collection groups)</li>
 </ul>
@@ -323,7 +325,7 @@ fetch errors:</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.11.0
+      1.12.0
   </span>
   
 </footer>
