@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'json_model.dart';
 import 'query_list_repository_base.dart';
+import 'write_ack_policy.dart';
 
 /// A builder function that produces a typed Firestore collection reference.
 ///
@@ -76,6 +77,10 @@ class FirestoreCollectionRepository<T extends JsonModel>
   ///   live Firestore updates. If false, fetches a one-shot snapshot only.
   /// - [pageSize]: Initial page size for paginated queries (default: 25).
   /// - [paginate]: If true (default), enables pagination via `loadMore()`.
+  /// - [writeAckPolicy]: How long writes wait for the Firestore **server ack**
+  ///   before resolving optimistically. The default awaits the ack
+  ///   indefinitely (legacy behavior); pass an [WriteAckPolicy.ackGrace] of
+  ///   ~1–2s for offline-safe writes. See [WriteAckPolicy] for semantics.
   ///
   /// On construction, listeners are attached and the initial query is run
   /// immediately against the resolved collection for the current user.
@@ -92,11 +97,18 @@ class FirestoreCollectionRepository<T extends JsonModel>
     super.onError,
     super.maxRetries = 5, // retry on transient listener errors
     super.retryDelay,
+    this.writeAckPolicy = const WriteAckPolicy(),
   }) : _colRefBuilder = colRefBuilder {
     start();
   }
 
   final ColRefBuilder _colRefBuilder;
+
+  /// The server-ack policy applied to every write on this repository
+  /// (Commands, `*Direct` writes, [create], and batch commits).
+  ///
+  /// Transactions are not covered — they require connectivity.
+  final WriteAckPolicy writeAckPolicy;
 
   // ── base hooks ────────────────────────────────────────────────────────────
   @override
@@ -107,17 +119,27 @@ class FirestoreCollectionRepository<T extends JsonModel>
   String keyOf(DocumentSnapshot<Map<String, dynamic>> doc) => doc.id;
 
   // ── CRUD (require signed-in user) ─────────────────────────────────────────
+  //
+  // Every write below runs under [writeAckPolicy] *inside* the Command
+  // function. That placement is deliberate: with a graced policy the Command
+  // completes within the grace even offline, so command_it's single-execution
+  // guard recovers and a hung server ack can never brick the Command for the
+  // session.
+
   /// Adds a new document to the collection.
   ///
   /// Input: A raw JSON map representing the document.
   /// Output: The generated document ID (or `null` on failure).
   /// Example: `add({'name': 'Alice'});`
-  late final add = Command.createAsync<Map<String, dynamic>, String?>((
-    Map<String, dynamic> data,
-  ) async {
-    final ref = await _colOrThrow().add(data);
-    return ref.id;
-  }, initialValue: null);
+  ///
+  /// The document ID is minted locally (no server round-trip) and the write
+  /// runs under [writeAckPolicy], so with a graced policy this resolves with
+  /// the real ID even while offline. Prefer [create] in new code — it returns
+  /// the ID directly without the Command wrapper.
+  late final add = Command.createAsync<Map<String, dynamic>, String?>(
+    (Map<String, dynamic> data) => create(data),
+    initialValue: null,
+  );
 
   /// Creates or replaces a document in the collection.
   ///
@@ -126,9 +148,9 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// merging with existing data if present.
   /// Example: `set(User(id: 'u1', name: 'Alice'));`
   late final set = Command.createAsyncNoResult<T>(
-    (T model) => _colOrThrow()
-        .doc(model.id)
-        .set(model.toJson(), SetOptions(merge: true)),
+    (T model) => _ackVoid(
+      _colOrThrow().doc(model.id).set(model.toJson(), SetOptions(merge: true)),
+    ),
   );
 
   /// Partially updates fields on an existing document.
@@ -137,7 +159,8 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Behavior: Only the provided fields are updated; other fields are untouched.
   /// Example: `patch((id: 'u1', data: {'name': 'Bob'}));`
   late final patch = Command.createAsyncNoResult<Patch>(
-    (Patch p) => _colOrThrow().doc(p.id).update(p.data),
+    (Patch p) =>
+        _ackVoid(_colOrThrow().doc(p.id).update(p.data)),
   );
 
   /// Fully updates an existing document.
@@ -147,7 +170,9 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// replacing all fields with `model.toJson()`.
   /// Example: `update(User(id: 'u1', name: 'Bob'));`
   late final update = Command.createAsyncNoResult<T>(
-    (T model) => _colOrThrow().doc(model.id).update(model.toJson()),
+    (T model) => _ackVoid(
+      _colOrThrow().doc(model.id).update(model.toJson()),
+    ),
   );
 
   /// Deletes a document from the collection.
@@ -156,8 +181,28 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Behavior: Removes the document at that path.
   /// Example: `delete(model.id);`
   late final delete = Command.createAsyncNoResult<String>(
-    (String docId) => _colOrThrow().doc(docId).delete(),
+    (String docId) =>
+        _ackVoid(_colOrThrow().doc(docId).delete()),
   );
+
+  /// Creates a new document with a **locally minted** ID and returns that ID.
+  ///
+  /// The ID is generated client-side via `.doc()` (Firestore document IDs are
+  /// always minted locally — there is no server round-trip for the ID), then
+  /// the data is written with `set` under [writeAckPolicy].
+  ///
+  /// This is the offline-safe replacement for [add]/[addDirect]: with a graced
+  /// policy the returned future resolves with the ID within the grace even
+  /// while offline (the write is durably queued in Firestore's local mutation
+  /// queue and syncs when connectivity returns). With the default policy it
+  /// behaves like `add` — resolving only on server ack.
+  ///
+  /// Not a Command, so multiple calls can overlap safely.
+  Future<String> create(Map<String, dynamic> data) async {
+    final ref = _colOrThrow().doc();
+    await _ackVoid(ref.set(data));
+    return ref.id;
+  }
 
   // ── direct writes (concurrent-safe, bypass Command guard) ────────────────
 
@@ -165,37 +210,36 @@ class FirestoreCollectionRepository<T extends JsonModel>
   ///
   /// Unlike [add], multiple calls can overlap safely.
   /// Returns the generated document ID.
-  Future<String> addDirect(Map<String, dynamic> data) async {
-    final ref = await _colOrThrow().add(data);
-    return ref.id;
-  }
+  ///
+  /// Alias of [create] — prefer [create] in new code.
+  Future<String> addDirect(Map<String, dynamic> data) => create(data);
 
   /// Creates or merges a document without the Command single-execution guard.
   ///
   /// Unlike [set], multiple calls can overlap safely.
-  Future<void> setDirect(T model) =>
-      _colOrThrow()
-          .doc(model.id)
-          .set(model.toJson(), SetOptions(merge: true));
+  Future<void> setDirect(T model) => _ackVoid(
+        _colOrThrow().doc(model.id).set(model.toJson(), SetOptions(merge: true)),
+      );
 
   /// Partially updates fields without the Command single-execution guard.
   ///
   /// Unlike [patch], multiple calls can overlap safely — use this when
   /// rapidly editing different documents in the same collection.
   Future<void> patchDirect(Patch p) =>
-      _colOrThrow().doc(p.id).update(p.data);
+      _ackVoid(_colOrThrow().doc(p.id).update(p.data));
 
   /// Fully updates a document without the Command single-execution guard.
   ///
   /// Unlike [update], multiple calls can overlap safely.
-  Future<void> updateDirect(T model) =>
-      _colOrThrow().doc(model.id).update(model.toJson());
+  Future<void> updateDirect(T model) => _ackVoid(
+        _colOrThrow().doc(model.id).update(model.toJson()),
+      );
 
   /// Deletes a document without the Command single-execution guard.
   ///
   /// Unlike [delete], multiple calls can overlap safely.
   Future<void> deleteDirect(String docId) =>
-      _colOrThrow().doc(docId).delete();
+      _ackVoid(_colOrThrow().doc(docId).delete());
 
   // ── batch operations ─────────────────────────────────────────────────────
   //
@@ -214,6 +258,12 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Note: batches are atomic per chunk only. Lists exceeding [batchLimit] are
   /// committed as multiple sequential batches, so a failure partway through
   /// leaves earlier chunks committed.
+  ///
+  /// Each chunk's `commit()` runs under [writeAckPolicy]: batches queue in
+  /// Firestore's local mutation store while offline but their commit futures
+  /// never complete, so an un-graced batch Command is just as brickable as a
+  /// single write. With a graced policy each chunk resolves within the grace
+  /// (so a multi-chunk call can take up to `chunks × grace` offline).
   Future<void> _runBatched<E>(
     List<E> items,
     void Function(WriteBatch batch, CollectionReference<Map<String, dynamic>> col, E item) populate,
@@ -227,7 +277,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
       for (final item in chunk) {
         populate(batch, col, item);
       }
-      await batch.commit();
+      await _ackVoid(batch.commit());
     }
   }
 
@@ -335,6 +385,13 @@ class FirestoreCollectionRepository<T extends JsonModel>
     guardAuth();
     return _colRefBuilder(fs, currentUserUid);
   }
+
+  /// Runs [write] under [writeAckPolicy], routing any post-grace ack error
+  /// (e.g. a security-rules rejection landing after the optimistic resolve)
+  /// to the repository's `onError` handler — the same handler stream and
+  /// fetch errors use — so late failures stay observable.
+  Future<void> _ackVoid(Future<void> write) =>
+      writeAckPolicy.applyVoid(write, onPostGraceError: errorHandler);
 
   // ── lifecycle ─────────────────────────────────────────────────────────────
   @override

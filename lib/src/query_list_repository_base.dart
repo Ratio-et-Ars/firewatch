@@ -195,6 +195,12 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
 
   // ── hooks for subclasses ──────────────────────────────────────────────────
 
+  /// The error handler passed at construction, if any. Exposed so subclasses
+  /// can route write-path errors (e.g. post-grace ack failures under a graced
+  /// `WriteAckPolicy`) to the same handler the stream/fetch paths use.
+  @protected
+  FirewatchErrorHandler? get errorHandler => _onError;
+
   /// Resolves the base query (before [queryBuilder] and the live-window limit)
   /// for the given [uid].
   @protected

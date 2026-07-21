@@ -8,6 +8,9 @@
 /// - Batch methods (`batchAdd`, `batchSet`, `batchPatch`, `batchUpdate`,
 ///   `batchDelete`) for multi-document writes via `WriteBatch` (atomic per
 ///   500-op chunk; longer lists commit as multiple sequential batches)
+/// - `WriteAckPolicy` for offline-safe writes: cap how long writes await the
+///   server ack, resolving optimistically once queued locally, and `create()`
+///   for locally-minted document IDs that resolve offline
 ///
 /// Designed to integrate with ValueNotifier and Listenable patterns for
 /// Flutter apps.
@@ -34,3 +37,4 @@ export 'src/doc_repository.dart';
 /// import 'package:firewatch/firewatch.dart';
 /// ```
 export 'src/json_model.dart';
+export 'src/write_ack_policy.dart';

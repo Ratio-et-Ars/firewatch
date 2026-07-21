@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.13.0
+
+### Added
+- **`WriteAckPolicy` — offline-safe write acks.** Firestore write futures
+  complete only on the **server ack**, so while offline an awaited write hangs
+  indefinitely even though it is already durably queued in the local mutation
+  queue. Worse, a hung write **bricks its Command for the rest of the
+  session**: `command_it`'s single-execution guard silently no-ops `run()`
+  while a previous execution is in flight (and `runAsync()` returns the
+  original hung future), and since repos are cached in registries, every later
+  invocation of that Command is silently dropped — one offline write becomes
+  session-long data loss. All three repositories now accept a
+  `writeAckPolicy` constructor parameter; with an `ackGrace` set (~1–2s
+  recommended), every write Command, `*Direct` write, and batch commit
+  resolves optimistically once the grace elapses. The policy is applied
+  *inside* each Command's function, so the Command completes within the grace
+  and the guard recovers — the bricking failure mode is structurally
+  impossible. Errors arriving before the grace still throw; errors arriving
+  after it can no longer throw (the future has already resolved) and are
+  instead routed fire-and-forget to the repository's existing `onError`
+  handler — the same handler stream/fetch errors use — so a late rules
+  rejection stays observable instead of vanishing. The default
+  (`ackGrace: null`) preserves the legacy await-indefinitely behavior exactly.
+  Transactions are not covered (they require connectivity).
+- **`create(Map<String, dynamic> data)` on `FirestoreCollectionRepository`.**
+  Mints the document ID locally via `.doc()` (no server round-trip), writes
+  under the ack policy, and returns the ID — so with a graced policy it
+  resolves with the real ID within the grace even while offline. Prefer it
+  over `add`/`addDirect` in new code.
+
+### Changed
+- **`add`/`addDirect` now mint the document ID locally** (exactly what
+  `CollectionReference.add` does internally) and run the underlying `set`
+  under the repo's `writeAckPolicy`, so they too resolve with the real ID
+  under a graced policy. With the default policy their behavior is unchanged:
+  the future completes only on server ack. `addDirect` is now an alias of
+  `create`.
+
 ## 1.12.0
 
 ### Added
