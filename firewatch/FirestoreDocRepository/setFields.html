@@ -76,7 +76,8 @@ write where the doc may not have been initialized yet.</p>
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">late final setFields = Command.createAsyncNoResult&lt;Map&lt;String, dynamic&gt;&gt;(
-  (map) =&gt; _docOrThrow().set(map, SetOptions(merge: true)),
+  (map) =&gt;
+      _ackVoid(_docOrThrow().set(map, SetOptions(merge: true))),
 );</code></pre>
 </section>
 
@@ -106,7 +107,7 @@ write where the doc may not have been initialized yet.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

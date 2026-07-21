@@ -70,7 +70,8 @@
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; deleteDirect() =&gt; _docOrThrow().delete();</code></pre>
+  <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; deleteDirect() =&gt;
+    _ackVoid(_docOrThrow().delete());</code></pre>
 </section>
 
 
@@ -98,7 +99,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

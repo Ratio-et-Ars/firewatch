@@ -73,7 +73,9 @@ Example: <code>update(User(id: 'u1', name: 'Bob'));</code></p>
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">late final update = Command.createAsyncNoResult&lt;T&gt;(
-  (T model) =&gt; _colOrThrow().doc(model.id).update(model.toJson()),
+  (T model) =&gt; _ackVoid(
+    _colOrThrow().doc(model.id).update(model.toJson()),
+  ),
 );</code></pre>
 </section>
 
@@ -103,7 +105,7 @@ Example: <code>update(User(id: 'u1', name: 'Bob'));</code></p>
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

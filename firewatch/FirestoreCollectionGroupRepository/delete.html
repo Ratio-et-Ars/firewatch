@@ -72,7 +72,7 @@
   <pre class="language-dart"><code class="language-dart">late final delete = Command.createAsyncNoResult&lt;String&gt;(
   (path) {
     guardAuth();
-    return fs.doc(path).delete();
+    return _ackVoid(fs.doc(path).delete());
   },
 );</code></pre>
 </section>
@@ -103,7 +103,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

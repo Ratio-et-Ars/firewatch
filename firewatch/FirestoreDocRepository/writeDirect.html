@@ -73,8 +73,9 @@ firing rapid successive writes (e.g. autosave during typing).</p>
     
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; writeDirect(T model) =&gt;
-    _docOrThrow().set(model.toJson(), SetOptions(merge: true));</code></pre>
+  <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; writeDirect(T model) =&gt; _ackVoid(
+      _docOrThrow().set(model.toJson(), SetOptions(merge: true)),
+    );</code></pre>
 </section>
 
 
@@ -102,7 +103,7 @@ firing rapid successive writes (e.g. autosave during typing).</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

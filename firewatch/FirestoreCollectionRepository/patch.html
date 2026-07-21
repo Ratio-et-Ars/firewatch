@@ -72,7 +72,8 @@ Example: <code>patch((id: 'u1', data: {'name': 'Bob'}));</code></p>
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">late final patch = Command.createAsyncNoResult&lt;Patch&gt;(
-  (Patch p) =&gt; _colOrThrow().doc(p.id).update(p.data),
+  (Patch p) =&gt;
+      _ackVoid(_colOrThrow().doc(p.id).update(p.data)),
 );</code></pre>
 </section>
 
@@ -102,7 +103,7 @@ Example: <code>patch((id: 'u1', data: {'name': 'Bob'}));</code></p>
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

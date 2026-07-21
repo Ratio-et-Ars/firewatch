@@ -70,6 +70,9 @@ single-item CRUD operations</li>
 <li>Batch methods (<code>batchAdd</code>, <code>batchSet</code>, <code>batchPatch</code>, <code>batchUpdate</code>,
 <code>batchDelete</code>) for multi-document writes via <code>WriteBatch</code> (atomic per
 500-op chunk; longer lists commit as multiple sequential batches)</li>
+<li><code>WriteAckPolicy</code> for offline-safe writes: cap how long writes await the
+server ack, resolving optimistically once queued locally, and <code>create()</code>
+for locally-minted document IDs that resolve offline</li>
 </ul>
 <p>Designed to integrate with ValueNotifier and Listenable patterns for
 Flutter apps.</p>
@@ -117,6 +120,15 @@ repo.add.execute({'name': 'Alice'});
 </dt>
 <dd>
   A minimal contract for Firestore-backed entities.
+</dd>
+
+          <dt id="WriteAckPolicy">
+  <span class="name "><a href="../firewatch/WriteAckPolicy-class.html">WriteAckPolicy</a></span> 
+
+</dt>
+<dd>
+  Controls how long a Firewatch write waits for the Firestore <strong>server
+acknowledgement</strong> before resolving optimistically.
 </dd>
 
       </dl>
@@ -282,7 +294,7 @@ repo.add.execute({'name': 'Alice'});
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

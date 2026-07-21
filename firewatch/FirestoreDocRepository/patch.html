@@ -74,7 +74,7 @@ partial-upsert semantics (create-if-missing).</p>
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">late final patch = Command.createAsyncNoResult&lt;Map&lt;String, dynamic&gt;&gt;(
-  (map) =&gt; _docOrThrow().update(map),
+  (map) =&gt; _ackVoid(_docOrThrow().update(map)),
 );</code></pre>
 </section>
 
@@ -104,7 +104,7 @@ partial-upsert semantics (create-if-missing).</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

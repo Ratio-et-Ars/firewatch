@@ -73,7 +73,7 @@ Behavior: Only the provided fields are updated.</p>
   <pre class="language-dart"><code class="language-dart">late final patch = Command.createAsyncNoResult&lt;GroupPatch&gt;(
   (r) {
     guardAuth();
-    return fs.doc(r.path).update(r.data);
+    return _ackVoid(fs.doc(r.path).update(r.data));
   },
 );</code></pre>
 </section>
@@ -104,7 +104,7 @@ Behavior: Only the provided fields are updated.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

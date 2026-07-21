@@ -66,17 +66,19 @@
 <p>Input: A raw JSON map representing the document.
 Output: The generated document ID (or <code>null</code> on failure).
 Example: <code>add({'name': 'Alice'});</code></p>
+<p>The document ID is minted locally (no server round-trip) and the write
+runs under <a href="../../firewatch/FirestoreCollectionRepository/writeAckPolicy.html">writeAckPolicy</a>, so with a graced policy this resolves with
+the real ID even while offline. Prefer <a href="../../firewatch/FirestoreCollectionRepository/create.html">create</a> in new code — it returns
+the ID directly without the Command wrapper.</p>
 </section>
 
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final add = Command.createAsync&lt;Map&lt;String, dynamic&gt;, String?&gt;((
-  Map&lt;String, dynamic&gt; data,
-) async {
-  final ref = await _colOrThrow().add(data);
-  return ref.id;
-}, initialValue: null);</code></pre>
+  <pre class="language-dart"><code class="language-dart">late final add = Command.createAsync&lt;Map&lt;String, dynamic&gt;, String?&gt;(
+  (Map&lt;String, dynamic&gt; data) =&gt; create(data),
+  initialValue: null,
+);</code></pre>
 </section>
 
 
@@ -105,7 +107,7 @@ Example: <code>add({'name': 'Alice'});</code></p>
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

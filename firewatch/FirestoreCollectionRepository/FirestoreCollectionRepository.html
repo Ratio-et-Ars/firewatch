@@ -67,6 +67,7 @@
 <li><span class="parameter" id="param-onError"><span class="type-annotation"><a href="../../firewatch/FirewatchErrorHandler.html">FirewatchErrorHandler</a>?</span> <span class="parameter-name">onError</span>, </span></li>
 <li><span class="parameter" id="param-maxRetries"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">maxRetries</span> = <span class="default-value">5</span>, </span></li>
 <li><span class="parameter" id="param-retryDelay"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/Duration-class.html">Duration</a></span> <span class="parameter-name">retryDelay</span> = <span class="default-value">const Duration(milliseconds: 500)</span>, </span></li>
+<li><span class="parameter" id="param-writeAckPolicy"><span class="type-annotation"><a href="../../firewatch/WriteAckPolicy-class.html">WriteAckPolicy</a></span> <span class="parameter-name">writeAckPolicy</span> = <span class="default-value">const WriteAckPolicy()</span>, </span></li>
 </ol>})
     </section>
     
@@ -90,6 +91,10 @@ triggers a query refresh.</li>
 live Firestore updates. If false, fetches a one-shot snapshot only.</li>
 <li><code>pageSize</code>: Initial page size for paginated queries (default: 25).</li>
 <li><code>paginate</code>: If true (default), enables pagination via <code>loadMore()</code>.</li>
+<li><code>writeAckPolicy</code>: How long writes wait for the Firestore <strong>server ack</strong>
+before resolving optimistically. The default awaits the ack
+indefinitely (legacy behavior); pass an <a href="../../firewatch/WriteAckPolicy/ackGrace.html">WriteAckPolicy.ackGrace</a> of
+~1–2s for offline-safe writes. See <a href="../../firewatch/WriteAckPolicy-class.html">WriteAckPolicy</a> for semantics.</li>
 </ul>
 <p>On construction, listeners are attached and the initial query is run
 immediately against the resolved collection for the current user.</p>
@@ -112,6 +117,7 @@ immediately against the resolved collection for the current user.</p>
   super.onError,
   super.maxRetries = 5, &#47;&#47; retry on transient listener errors
   super.retryDelay,
+  this.writeAckPolicy = const WriteAckPolicy(),
 }) : _colRefBuilder = colRefBuilder {
   start();
 }</code></pre>
@@ -142,7 +148,7 @@ immediately against the resolved collection for the current user.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1, user-scalable=no">
+  <meta name="description" content="API docs for the apply method from the WriteAckPolicy class, for the Dart programming language.">
+  <title>apply method - WriteAckPolicy class - firewatch library - Dart API</title>
+
+
+  
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+  
+  <link rel="stylesheet" href="../../static-assets/github.css?v1">
+  <link rel="stylesheet" href="../../static-assets/styles.css?v1">
+  <link rel="icon" href="../../static-assets/favicon.png?v1">
+  
+</head>
+
+<body data-base-href="../../" data-using-base-href="false" class="light-theme">
+<div id="overlay-under-drawer"></div>
+<header id="title">
+  <span id="sidenav-left-toggle" class="material-symbols-outlined" role="button" tabindex="0">menu</span>
+  <ol class="breadcrumbs gt-separated dark hidden-xs">
+    <li><a href="../../index.html">firewatch</a></li>
+    <li><a href="../../firewatch/">firewatch.dart</a></li>
+    <li><a href="../../firewatch/WriteAckPolicy-class.html">WriteAckPolicy</a></li>
+    <li class="self-crumb">apply&lt;<wbr><span class="type-parameter">T</span>&gt; method</li>
+  </ol>
+  <div class="self-name">apply</div>
+  <form class="search navbar-right" role="search">
+    <input type="text" id="search-box" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+  <button class="toggle" id="theme-button" title="Toggle between light and dark mode" aria-label="Light and dark mode toggle">
+    <span id="dark-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      dark_mode
+    </span>
+    <span id="light-theme-button" class="material-symbols-outlined" aria-hidden="true">
+      light_mode
+    </span>
+  </button>
+</header>
+<main>
+<div
+    id="dartdoc-main-content"
+    class="main-content"
+    data-above-sidebar="firewatch&#47;WriteAckPolicy-class-sidebar.html"
+    data-below-sidebar="">
+    <div>
+<h1><span class="kind-method">apply&lt;<wbr><span class="type-parameter">T</span>&gt;</span> method 
+</h1></div>
+
+    <section class="multi-line-signature">
+      
+<span class="returntype"><a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">T</span>&gt;</span></span>
+<span class="name ">apply</span>&lt;<wbr><span class="type-parameter">T</span>&gt;(<wbr><ol class="parameter-list"> <li><span class="parameter" id="apply-param-write"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-async/Future-class.html">Future</a><span class="signature">&lt;<wbr><span class="type-parameter">T</span>&gt;</span></span> <span class="parameter-name">write</span>, {</span></li>
+<li><span class="parameter" id="apply-param-onTimeout"><span>required</span> <span class="type-annotation">T</span> <span class="parameter-name">onTimeout</span>(), </span></li>
+<li><span class="parameter" id="apply-param-onPostGraceError"><span class="type-annotation"><a href="../../firewatch/FirewatchErrorHandler.html">FirewatchErrorHandler</a>?</span> <span class="parameter-name">onPostGraceError</span>, </span></li>
+</ol>})
+
+      
+
+    </section>
+    
+<section class="desc markdown">
+  <p>Applies this policy to <code>write</code>.</p>
+<p>With a <code>null</code> <a href="../../firewatch/WriteAckPolicy/ackGrace.html">ackGrace</a> the future is returned unchanged. With a grace,
+the future is capped: if it has not settled when the grace elapses, the
+returned future completes with <code>onTimeout()</code> (optimistic resolve).
+Errors that arrive before the grace still throw normally.</p>
+<p>Errors that arrive <strong>after</strong> the grace cannot throw through the returned
+future (it has already resolved). With <code>onPostGraceError</code> set they are
+reported there fire-and-forget — exactly once, with the original error
+and stack trace — so a late server rejection (e.g. a security-rules
+denial on a slow connection) stays observable. Without it they are
+swallowed. Post-grace errors never become unhandled zone errors either
+way. With a <code>null</code> <a href="../../firewatch/WriteAckPolicy/ackGrace.html">ackGrace</a>, <code>onPostGraceError</code> is never invoked
+(errors propagate through the returned future as always).</p>
+</section>
+
+
+    
+<section class="summary source-code" id="source">
+  <h2><span>Implementation</span></h2>
+  <pre class="language-dart"><code class="language-dart">Future&lt;T&gt; apply&lt;T&gt;(
+  Future&lt;T&gt; write, {
+  required T Function() onTimeout,
+  FirewatchErrorHandler? onPostGraceError,
+}) {
+  final grace = ackGrace;
+  if (grace == null) return write;
+
+  var resolvedOptimistically = false;
+  if (onPostGraceError != null) {
+    &#47;&#47; Watch the original write fire-and-forget. Pre-grace errors throw
+    &#47;&#47; through the returned (timed-out) future below and are NOT reported
+    &#47;&#47; here; only errors landing after the optimistic resolve are routed to
+    &#47;&#47; the callback. This listener also guarantees the error is handled, so
+    &#47;&#47; it can never surface as an unhandled zone error.
+    unawaited(
+      write.then&lt;void&gt;(
+        (_) {},
+        onError: (Object error, StackTrace stackTrace) {
+          if (resolvedOptimistically) onPostGraceError(error, stackTrace);
+        },
+      ),
+    );
+  }
+
+  return write.timeout(grace, onTimeout: () {
+    resolvedOptimistically = true;
+    return onTimeout();
+  });
+}</code></pre>
+</section>
+
+
+  </div> <!-- /.main-content -->
+  <div id="dartdoc-sidebar-left" class="sidebar sidebar-offcanvas-left">
+    <!-- The search input and breadcrumbs below are only responsively visible at low resolutions. -->
+<header id="header-search-sidebar" class="hidden-l">
+  <form class="search-sidebar" role="search">
+    <input type="text" id="search-sidebar" autocomplete="off" disabled class="form-control typeahead" placeholder="Loading search...">
+  </form>
+</header>
+<ol class="breadcrumbs gt-separated dark hidden-l" id="sidebar-nav">
+    <li><a href="../../index.html">firewatch</a></li>
+    <li><a href="../../firewatch/">firewatch</a></li>
+    <li><a href="../../firewatch/WriteAckPolicy-class.html">WriteAckPolicy</a></li>
+    <li class="self-crumb">apply&lt;<wbr><span class="type-parameter">T</span>&gt; method</li>
+</ol>
+
+    <h5>WriteAckPolicy class</h5>
+    <div id="dartdoc-sidebar-left-content"></div>
+  </div><!--/.sidebar-offcanvas-->
+  <div id="dartdoc-sidebar-right" class="sidebar sidebar-offcanvas-right">
+</div><!--/.sidebar-offcanvas-->
+</main>
+<footer>
+  <span class="no-break">
+    firewatch
+      1.13.0
+  </span>
+  
+</footer>
+
+
+<script src="../../static-assets/highlight.pack.js?v1"></script>
+<script src="../../static-assets/docs.dart.js"></script>
+
+</body>
+</html>
+

@@ -65,6 +65,7 @@
 <li><span class="parameter" id="param-pageSize"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/int-class.html">int</a></span> <span class="parameter-name">pageSize</span> = <span class="default-value">25</span>, </span></li>
 <li><span class="parameter" id="param-paginate"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">paginate</span> = <span class="default-value">true</span>, </span></li>
 <li><span class="parameter" id="param-onError"><span class="type-annotation"><a href="../../firewatch/FirewatchErrorHandler.html">FirewatchErrorHandler</a>?</span> <span class="parameter-name">onError</span>, </span></li>
+<li><span class="parameter" id="param-writeAckPolicy"><span class="type-annotation"><a href="../../firewatch/WriteAckPolicy-class.html">WriteAckPolicy</a></span> <span class="parameter-name">writeAckPolicy</span> = <span class="default-value">const WriteAckPolicy()</span>, </span></li>
 </ol>})
     </section>
     
@@ -88,6 +89,10 @@ triggers a query refresh.</li>
 live Firestore updates. If false, fetches a one-shot snapshot only.</li>
 <li><code>pageSize</code>: Initial page size for paginated queries (default: 25).</li>
 <li><code>paginate</code>: If true (default), enables pagination via <code>loadMore()</code>.</li>
+<li><code>writeAckPolicy</code>: How long writes wait for the Firestore <strong>server ack</strong>
+before resolving optimistically. The default awaits the ack
+indefinitely (legacy behavior); pass an <a href="../../firewatch/WriteAckPolicy/ackGrace.html">WriteAckPolicy.ackGrace</a> of
+~1-2s for offline-safe writes. See <a href="../../firewatch/WriteAckPolicy-class.html">WriteAckPolicy</a> for semantics.</li>
 </ul>
 </section>
 
@@ -106,6 +111,7 @@ live Firestore updates. If false, fetches a one-shot snapshot only.</li>
   super.pageSize,
   super.paginate,
   super.onError,
+  this.writeAckPolicy = const WriteAckPolicy(),
 }) : _queryRefBuilder = queryRefBuilder {
   start();
 }</code></pre>
@@ -136,7 +142,7 @@ live Firestore updates. If false, fetches a one-shot snapshot only.</li>
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

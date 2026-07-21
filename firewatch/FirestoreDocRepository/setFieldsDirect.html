@@ -73,7 +73,7 @@ the doc if missing.</p>
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
   <pre class="language-dart"><code class="language-dart">Future&lt;void&gt; setFieldsDirect(Map&lt;String, dynamic&gt; fields) =&gt;
-    _docOrThrow().set(fields, SetOptions(merge: true));</code></pre>
+    _ackVoid(_docOrThrow().set(fields, SetOptions(merge: true)));</code></pre>
 </section>
 
 
@@ -101,7 +101,7 @@ the doc if missing.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>

@@ -63,6 +63,7 @@
 <li><span class="parameter" id="param-authUid"><span class="type-annotation"><a href="../../firewatch/AuthUidListenable.html">AuthUidListenable</a>?</span> <span class="parameter-name">authUid</span>, </span></li>
 <li><span class="parameter" id="param-subscribe"><span class="type-annotation"><a href="https://api.flutter.dev/flutter/dart-core/bool-class.html">bool</a></span> <span class="parameter-name">subscribe</span> = <span class="default-value">true</span>, </span></li>
 <li><span class="parameter" id="param-onError"><span class="type-annotation"><a href="../../firewatch/FirewatchErrorHandler.html">FirewatchErrorHandler</a>?</span> <span class="parameter-name">onError</span>, </span></li>
+<li><span class="parameter" id="param-writeAckPolicy"><span class="type-annotation"><a href="../../firewatch/WriteAckPolicy-class.html">WriteAckPolicy</a></span> <span class="parameter-name">writeAckPolicy</span> = <span class="default-value">const WriteAckPolicy()</span>, </span></li>
 </ol>})
     </section>
     
@@ -81,6 +82,7 @@
   AuthUidListenable? authUid, &#47;&#47; omit for public&#47;unauthenticated docs
   bool subscribe = true,
   FirewatchErrorHandler? onError,
+  this.writeAckPolicy = const WriteAckPolicy(),
 })  : _fs = firestore ?? FirebaseFirestore.instance,
       _fromJson = fromJson,
       _docRefBuilder = docRefBuilder,
@@ -118,7 +120,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      1.12.0
+      1.13.0
   </span>
   
 </footer>
