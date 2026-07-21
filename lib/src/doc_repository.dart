@@ -136,6 +136,13 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
     return _docRefBuilder(_fs, uid);
   }
 
+  /// Runs [write] under [writeAckPolicy], routing any post-grace ack error
+  /// (e.g. a security-rules rejection landing after the optimistic resolve)
+  /// to the repository's `onError` handler — the same handler stream and
+  /// fetch errors use — so late failures stay observable.
+  Future<void> _ackVoid(Future<void> write) =>
+      writeAckPolicy.applyVoid(write, onPostGraceError: _onError);
+
   void _onAuth() => _swap(currentUserUid);
 
   /// Attach to the correct document for the given [uid].
@@ -274,7 +281,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   /// Uses `set` with `merge: true`, so existing fields not present in
   /// [model] are preserved. Throws [StateError] if not authenticated.
   late final write = Command.createAsyncNoResult<T>(
-    (T model) => writeAckPolicy.applyVoid(
+    (T model) => _ackVoid(
       _docOrThrow().set(model.toJson(), SetOptions(merge: true)),
     ),
   );
@@ -284,7 +291,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   /// Unlike [write], this fails if the document does not already exist.
   /// Throws [StateError] if not authenticated.
   late final update = Command.createAsyncNoResult<T>(
-    (T model) => writeAckPolicy.applyVoid(_docOrThrow().update(model.toJson())),
+    (T model) => _ackVoid(_docOrThrow().update(model.toJson())),
   );
 
   /// Partially updates specific fields on the document.
@@ -296,7 +303,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   /// document does not yet exist**. Use [setFields] when you want
   /// partial-upsert semantics (create-if-missing).
   late final patch = Command.createAsyncNoResult<Map<String, dynamic>>(
-    (map) => writeAckPolicy.applyVoid(_docOrThrow().update(map)),
+    (map) => _ackVoid(_docOrThrow().update(map)),
   );
 
   /// Partially sets specific fields on the document, creating it if missing.
@@ -312,14 +319,14 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   /// Throws [StateError] if not authenticated.
   late final setFields = Command.createAsyncNoResult<Map<String, dynamic>>(
     (map) =>
-        writeAckPolicy.applyVoid(_docOrThrow().set(map, SetOptions(merge: true))),
+        _ackVoid(_docOrThrow().set(map, SetOptions(merge: true))),
   );
 
   /// Deletes the document.
   ///
   /// Throws [StateError] if not authenticated.
   late final delete = Command.createAsyncNoParamNoResult(
-    () => writeAckPolicy.applyVoid(_docOrThrow().delete()),
+    () => _ackVoid(_docOrThrow().delete()),
   );
 
   // ── direct writes (concurrent-safe, bypass Command guard) ────────────────
@@ -329,7 +336,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   ///
   /// Unlike [write], multiple calls can overlap safely — use this when
   /// firing rapid successive writes (e.g. autosave during typing).
-  Future<void> writeDirect(T model) => writeAckPolicy.applyVoid(
+  Future<void> writeDirect(T model) => _ackVoid(
         _docOrThrow().set(model.toJson(), SetOptions(merge: true)),
       );
 
@@ -339,7 +346,7 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   /// Unlike [update], multiple calls can overlap safely.
   /// Fails if the document does not exist.
   Future<void> updateDirect(T model) =>
-      writeAckPolicy.applyVoid(_docOrThrow().update(model.toJson()));
+      _ackVoid(_docOrThrow().update(model.toJson()));
 
   /// Partially updates specific fields without the Command guard.
   ///
@@ -347,20 +354,20 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   /// Fails if the document does not exist — use [setFieldsDirect] for
   /// partial-upsert semantics.
   Future<void> patchDirect(Map<String, dynamic> fields) =>
-      writeAckPolicy.applyVoid(_docOrThrow().update(fields));
+      _ackVoid(_docOrThrow().update(fields));
 
   /// Partially sets specific fields without the Command guard, creating
   /// the doc if missing.
   ///
   /// Unlike [setFields], multiple calls can overlap safely.
-  Future<void> setFieldsDirect(Map<String, dynamic> fields) => writeAckPolicy
-      .applyVoid(_docOrThrow().set(fields, SetOptions(merge: true)));
+  Future<void> setFieldsDirect(Map<String, dynamic> fields) =>
+      _ackVoid(_docOrThrow().set(fields, SetOptions(merge: true)));
 
   /// Deletes the document without the Command guard.
   ///
   /// Unlike [delete], multiple calls can overlap safely.
   Future<void> deleteDirect() =>
-      writeAckPolicy.applyVoid(_docOrThrow().delete());
+      _ackVoid(_docOrThrow().delete());
 
   // ── lifecycle ─────────────────────────────────────────────────────────────
   @override

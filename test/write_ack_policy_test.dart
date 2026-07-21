@@ -217,7 +217,7 @@ void main() {
     });
 
     test(
-        'error arriving AFTER the grace is swallowed '
+        'error arriving AFTER the grace is swallowed when no handler is given '
         '(the future already resolved optimistically)', () async {
       const policy = WriteAckPolicy(ackGrace: _grace);
       final write = Completer<void>();
@@ -228,6 +228,81 @@ void main() {
       // (an unhandled zone error would fail this test).
       write.completeError(Exception('late rejection'));
       await Future<void>.delayed(const Duration(milliseconds: 20));
+    });
+
+    test(
+        'error arriving AFTER the grace is routed to onPostGraceError exactly '
+        'once; returned future stays resolved; no unhandled zone error',
+        () async {
+      const policy = WriteAckPolicy(ackGrace: _grace);
+      final write = Completer<void>();
+      final reported = <Object>[];
+      final stacks = <StackTrace>[];
+
+      // Resolves optimistically at the grace — the late error must never
+      // affect this future.
+      await policy.applyVoid(
+        write.future,
+        onPostGraceError: (error, stackTrace) {
+          reported.add(error);
+          stacks.add(stackTrace);
+        },
+      );
+      expect(reported, isEmpty); // nothing reported yet — write still pending
+
+      final rejection = Exception('rules rejection after grace');
+      write.completeError(rejection);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(reported, [rejection]); // exactly once, the original error
+      expect(stacks, hasLength(1));
+      // An unhandled zone error here would fail the test — none occurs.
+    });
+
+    test('error arriving BEFORE the grace throws and is NOT routed to '
+        'onPostGraceError', () async {
+      const policy = WriteAckPolicy(ackGrace: _wellPastGrace);
+      final write = Completer<void>();
+      final reported = <Object>[];
+
+      final applied = policy.applyVoid(
+        write.future,
+        onPostGraceError: (error, stackTrace) => reported.add(error),
+      );
+      write.completeError(Exception('permission-denied'));
+      await expectLater(applied, throwsException);
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(reported, isEmpty); // pre-grace errors throw, never double-report
+    });
+
+    test('null ackGrace never invokes onPostGraceError (errors propagate)',
+        () async {
+      const policy = WriteAckPolicy();
+      final reported = <Object>[];
+
+      await expectLater(
+        policy.applyVoid(
+          Future.error(Exception('boom')),
+          onPostGraceError: (error, stackTrace) => reported.add(error),
+        ),
+        throwsException,
+      );
+      expect(reported, isEmpty);
+    });
+
+    test('post-grace ACK (success) does not invoke onPostGraceError', () async {
+      const policy = WriteAckPolicy(ackGrace: _grace);
+      final write = Completer<void>();
+      final reported = <Object>[];
+
+      await policy.applyVoid(
+        write.future,
+        onPostGraceError: (error, stackTrace) => reported.add(error),
+      );
+      write.complete(); // late ack, not an error
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(reported, isEmpty);
     });
 
     test('ack arriving before the grace resolves immediately', () async {
@@ -261,6 +336,7 @@ void main() {
       _HungBackend backend, {
       WriteAckPolicy policy = const WriteAckPolicy(),
       FirebaseFirestore? firestore,
+      FirewatchErrorHandler? onError,
     }) =>
         FirestoreCollectionRepository<Item>(
           firestore: firestore ?? FakeFirebaseFirestore(),
@@ -268,6 +344,7 @@ void main() {
           colRefBuilder: (fs, uid) => _HungCollectionRef(backend),
           maxRetries: 0,
           writeAckPolicy: policy,
+          onError: onError,
         );
 
     test(
@@ -401,6 +478,29 @@ void main() {
       repo.dispose();
     });
 
+    test(
+        "post-grace write error is routed to the repo's onError handler "
+        'exactly once (late rules rejection stays observable)', () async {
+      final backend = _HungBackend();
+      final reported = <Object>[];
+      final repo = buildRepo(
+        backend,
+        policy: const WriteAckPolicy(ackGrace: _grace),
+        onError: (error, stackTrace) => reported.add(error),
+      );
+
+      await repo.setDirect(Item(id: 'a', n: 1)); // optimistic resolve
+      expect(reported, isEmpty);
+
+      final rejection = FirebaseException(
+          plugin: 'firestore', code: 'permission-denied');
+      backend.ack.completeError(rejection);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(reported, [rejection]);
+      repo.dispose();
+    });
+
     test('graced batch commit resolves while offline (batch Command reusable)',
         () async {
       final backend = _HungBackend();
@@ -438,12 +538,14 @@ void main() {
     FirestoreDocRepository<Item> buildRepo(
       _HungBackend backend, {
       WriteAckPolicy policy = const WriteAckPolicy(),
+      FirewatchErrorHandler? onError,
     }) =>
         FirestoreDocRepository<Item>(
           firestore: FakeFirebaseFirestore(),
           fromJson: Item.fromJson,
           docRefBuilder: (fs, uid) => _HungDocRef('the-doc', backend),
           writeAckPolicy: policy,
+          onError: onError,
         );
 
     test('default policy: offline write hangs (legacy behavior)', () async {
@@ -470,6 +572,29 @@ void main() {
       await repo.write.runAsync(Item(id: 'the-doc', n: 2));
 
       expect(backend.log, ['set:the-doc', 'set:the-doc']);
+      repo.dispose();
+    });
+
+    test(
+        "post-grace write error is routed to the doc repo's onError handler",
+        () async {
+      final backend = _HungBackend();
+      final reported = <Object>[];
+      final repo = buildRepo(
+        backend,
+        policy: const WriteAckPolicy(ackGrace: _grace),
+        onError: (error, stackTrace) => reported.add(error),
+      );
+
+      await repo.write.runAsync(Item(id: 'the-doc', n: 1));
+      expect(reported, isEmpty);
+
+      final rejection = FirebaseException(
+          plugin: 'firestore', code: 'permission-denied');
+      backend.ack.completeError(rejection);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(reported, [rejection]);
       repo.dispose();
     });
 

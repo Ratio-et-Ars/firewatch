@@ -148,7 +148,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// merging with existing data if present.
   /// Example: `set(User(id: 'u1', name: 'Alice'));`
   late final set = Command.createAsyncNoResult<T>(
-    (T model) => writeAckPolicy.applyVoid(
+    (T model) => _ackVoid(
       _colOrThrow().doc(model.id).set(model.toJson(), SetOptions(merge: true)),
     ),
   );
@@ -160,7 +160,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Example: `patch((id: 'u1', data: {'name': 'Bob'}));`
   late final patch = Command.createAsyncNoResult<Patch>(
     (Patch p) =>
-        writeAckPolicy.applyVoid(_colOrThrow().doc(p.id).update(p.data)),
+        _ackVoid(_colOrThrow().doc(p.id).update(p.data)),
   );
 
   /// Fully updates an existing document.
@@ -170,7 +170,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// replacing all fields with `model.toJson()`.
   /// Example: `update(User(id: 'u1', name: 'Bob'));`
   late final update = Command.createAsyncNoResult<T>(
-    (T model) => writeAckPolicy.applyVoid(
+    (T model) => _ackVoid(
       _colOrThrow().doc(model.id).update(model.toJson()),
     ),
   );
@@ -182,7 +182,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Example: `delete(model.id);`
   late final delete = Command.createAsyncNoResult<String>(
     (String docId) =>
-        writeAckPolicy.applyVoid(_colOrThrow().doc(docId).delete()),
+        _ackVoid(_colOrThrow().doc(docId).delete()),
   );
 
   /// Creates a new document with a **locally minted** ID and returns that ID.
@@ -200,7 +200,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Not a Command, so multiple calls can overlap safely.
   Future<String> create(Map<String, dynamic> data) async {
     final ref = _colOrThrow().doc();
-    await writeAckPolicy.applyVoid(ref.set(data));
+    await _ackVoid(ref.set(data));
     return ref.id;
   }
 
@@ -217,7 +217,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Creates or merges a document without the Command single-execution guard.
   ///
   /// Unlike [set], multiple calls can overlap safely.
-  Future<void> setDirect(T model) => writeAckPolicy.applyVoid(
+  Future<void> setDirect(T model) => _ackVoid(
         _colOrThrow().doc(model.id).set(model.toJson(), SetOptions(merge: true)),
       );
 
@@ -226,12 +226,12 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Unlike [patch], multiple calls can overlap safely — use this when
   /// rapidly editing different documents in the same collection.
   Future<void> patchDirect(Patch p) =>
-      writeAckPolicy.applyVoid(_colOrThrow().doc(p.id).update(p.data));
+      _ackVoid(_colOrThrow().doc(p.id).update(p.data));
 
   /// Fully updates a document without the Command single-execution guard.
   ///
   /// Unlike [update], multiple calls can overlap safely.
-  Future<void> updateDirect(T model) => writeAckPolicy.applyVoid(
+  Future<void> updateDirect(T model) => _ackVoid(
         _colOrThrow().doc(model.id).update(model.toJson()),
       );
 
@@ -239,7 +239,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   ///
   /// Unlike [delete], multiple calls can overlap safely.
   Future<void> deleteDirect(String docId) =>
-      writeAckPolicy.applyVoid(_colOrThrow().doc(docId).delete());
+      _ackVoid(_colOrThrow().doc(docId).delete());
 
   // ── batch operations ─────────────────────────────────────────────────────
   //
@@ -277,7 +277,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
       for (final item in chunk) {
         populate(batch, col, item);
       }
-      await writeAckPolicy.applyVoid(batch.commit());
+      await _ackVoid(batch.commit());
     }
   }
 
@@ -385,6 +385,13 @@ class FirestoreCollectionRepository<T extends JsonModel>
     guardAuth();
     return _colRefBuilder(fs, currentUserUid);
   }
+
+  /// Runs [write] under [writeAckPolicy], routing any post-grace ack error
+  /// (e.g. a security-rules rejection landing after the optimistic resolve)
+  /// to the repository's `onError` handler — the same handler stream and
+  /// fetch errors use — so late failures stay observable.
+  Future<void> _ackVoid(Future<void> write) =>
+      writeAckPolicy.applyVoid(write, onPostGraceError: errorHandler);
 
   // ── lifecycle ─────────────────────────────────────────────────────────────
   @override

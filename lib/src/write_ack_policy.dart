@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+
+import 'json_model.dart';
 
 /// Controls how long a Firewatch write waits for the Firestore **server
 /// acknowledgement** before resolving optimistically.
@@ -31,8 +35,11 @@ import 'package:flutter/foundation.dart';
 ///     is optimistic-resolve, not failure: the write is already committed to
 ///     Firestore's local mutation queue and will sync when connectivity
 ///     returns. It is **not** server-confirmed — a rules rejection or invalid
-///     write can still fail later, and any error arriving **after** the grace
-///     is swallowed (the future has already resolved).
+///     write can still fail later. An error arriving **after** the grace can
+///     no longer throw (the future has already resolved); it is reported
+///     fire-and-forget to the `onPostGraceError` callback when one is
+///     provided (the Firewatch repositories wire their `onError` handler
+///     here), otherwise swallowed.
 ///
 /// ## Guidance
 ///
@@ -66,17 +73,53 @@ class WriteAckPolicy {
   /// With a `null` [ackGrace] the future is returned unchanged. With a grace,
   /// the future is capped: if it has not settled when the grace elapses, the
   /// returned future completes with `onTimeout()` (optimistic resolve).
-  /// Errors that arrive before the grace still throw normally; errors that
-  /// arrive after it are swallowed (the returned future has already resolved).
-  Future<T> apply<T>(Future<T> write, {required T Function() onTimeout}) {
+  /// Errors that arrive before the grace still throw normally.
+  ///
+  /// Errors that arrive **after** the grace cannot throw through the returned
+  /// future (it has already resolved). With [onPostGraceError] set they are
+  /// reported there fire-and-forget — exactly once, with the original error
+  /// and stack trace — so a late server rejection (e.g. a security-rules
+  /// denial on a slow connection) stays observable. Without it they are
+  /// swallowed. Post-grace errors never become unhandled zone errors either
+  /// way. With a `null` [ackGrace], [onPostGraceError] is never invoked
+  /// (errors propagate through the returned future as always).
+  Future<T> apply<T>(
+    Future<T> write, {
+    required T Function() onTimeout,
+    FirewatchErrorHandler? onPostGraceError,
+  }) {
     final grace = ackGrace;
     if (grace == null) return write;
-    return write.timeout(grace, onTimeout: onTimeout);
+
+    var resolvedOptimistically = false;
+    if (onPostGraceError != null) {
+      // Watch the original write fire-and-forget. Pre-grace errors throw
+      // through the returned (timed-out) future below and are NOT reported
+      // here; only errors landing after the optimistic resolve are routed to
+      // the callback. This listener also guarantees the error is handled, so
+      // it can never surface as an unhandled zone error.
+      unawaited(
+        write.then<void>(
+          (_) {},
+          onError: (Object error, StackTrace stackTrace) {
+            if (resolvedOptimistically) onPostGraceError(error, stackTrace);
+          },
+        ),
+      );
+    }
+
+    return write.timeout(grace, onTimeout: () {
+      resolvedOptimistically = true;
+      return onTimeout();
+    });
   }
 
   /// [apply] specialized for `Future<void>` writes (the common case).
-  Future<void> applyVoid(Future<void> write) =>
-      apply<void>(write, onTimeout: () {});
+  Future<void> applyVoid(
+    Future<void> write, {
+    FirewatchErrorHandler? onPostGraceError,
+  }) =>
+      apply<void>(write, onTimeout: () {}, onPostGraceError: onPostGraceError);
 
   @override
   bool operator ==(Object other) =>

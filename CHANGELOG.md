@@ -17,8 +17,11 @@
   resolves optimistically once the grace elapses. The policy is applied
   *inside* each Command's function, so the Command completes within the grace
   and the guard recovers — the bricking failure mode is structurally
-  impossible. Errors arriving before the grace still throw; errors after it
-  are swallowed (the future has already resolved). The default
+  impossible. Errors arriving before the grace still throw; errors arriving
+  after it can no longer throw (the future has already resolved) and are
+  instead routed fire-and-forget to the repository's existing `onError`
+  handler — the same handler stream/fetch errors use — so a late rules
+  rejection stays observable instead of vanishing. The default
   (`ackGrace: null`) preserves the legacy await-indefinitely behavior exactly.
   Transactions are not covered (they require connectivity).
 - **`create(Map<String, dynamic> data)` on `FirestoreCollectionRepository`.**
