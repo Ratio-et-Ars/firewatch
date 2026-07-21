@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'json_model.dart';
 import 'query_list_repository_base.dart';
+import 'write_ack_policy.dart';
 
 /// A builder function that produces a Firestore [Query] for a collection group.
 ///
@@ -74,6 +75,10 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   ///   live Firestore updates. If false, fetches a one-shot snapshot only.
   /// - [pageSize]: Initial page size for paginated queries (default: 25).
   /// - [paginate]: If true (default), enables pagination via `loadMore()`.
+  /// - [writeAckPolicy]: How long writes wait for the Firestore **server ack**
+  ///   before resolving optimistically. The default awaits the ack
+  ///   indefinitely (legacy behavior); pass an [WriteAckPolicy.ackGrace] of
+  ///   ~1-2s for offline-safe writes. See [WriteAckPolicy] for semantics.
   FirestoreCollectionGroupRepository({
     required super.fromJson,
     required QueryRefBuilder queryRefBuilder,
@@ -85,11 +90,18 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
     super.pageSize,
     super.paginate,
     super.onError,
+    this.writeAckPolicy = const WriteAckPolicy(),
   }) : _queryRefBuilder = queryRefBuilder {
     start();
   }
 
   final QueryRefBuilder _queryRefBuilder;
+
+  /// The server-ack policy applied to every write on this repository
+  /// (Commands and `*Direct` writes).
+  ///
+  /// Transactions are not covered — they require connectivity.
+  final WriteAckPolicy writeAckPolicy;
 
   // ── base hooks ────────────────────────────────────────────────────────────
   @override
@@ -103,6 +115,11 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
       doc.reference.path;
 
   // ── CRUD (by document path) ─────────────────────────────────────────────
+  //
+  // Every write runs under [writeAckPolicy] *inside* the Command function, so
+  // with a graced policy the Command completes within the grace even offline
+  // and command_it's single-execution guard recovers — a hung server ack can
+  // never brick the Command for the session.
 
   /// Creates or merges a document at a specific path.
   ///
@@ -112,7 +129,9 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   late final set = Command.createAsyncNoResult<({String path, T model})>(
     (r) {
       guardAuth();
-      return fs.doc(r.path).set(r.model.toJson(), SetOptions(merge: true));
+      return writeAckPolicy.applyVoid(
+        fs.doc(r.path).set(r.model.toJson(), SetOptions(merge: true)),
+      );
     },
   );
 
@@ -123,7 +142,7 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   late final update = Command.createAsyncNoResult<({String path, T model})>(
     (r) {
       guardAuth();
-      return fs.doc(r.path).update(r.model.toJson());
+      return writeAckPolicy.applyVoid(fs.doc(r.path).update(r.model.toJson()));
     },
   );
 
@@ -134,7 +153,7 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   late final patch = Command.createAsyncNoResult<GroupPatch>(
     (r) {
       guardAuth();
-      return fs.doc(r.path).update(r.data);
+      return writeAckPolicy.applyVoid(fs.doc(r.path).update(r.data));
     },
   );
 
@@ -144,7 +163,7 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   late final delete = Command.createAsyncNoResult<String>(
     (path) {
       guardAuth();
-      return fs.doc(path).delete();
+      return writeAckPolicy.applyVoid(fs.doc(path).delete());
     },
   );
 
@@ -155,9 +174,9 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   /// Unlike [set], multiple calls can overlap safely.
   Future<void> setDirect(({String path, T model}) input) {
     guardAuth();
-    return fs
-        .doc(input.path)
-        .set(input.model.toJson(), SetOptions(merge: true));
+    return writeAckPolicy.applyVoid(
+      fs.doc(input.path).set(input.model.toJson(), SetOptions(merge: true)),
+    );
   }
 
   /// Partially updates fields without the Command single-execution guard.
@@ -166,7 +185,7 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   /// rapidly editing different documents in the same collection group.
   Future<void> patchDirect(GroupPatch p) {
     guardAuth();
-    return fs.doc(p.path).update(p.data);
+    return writeAckPolicy.applyVoid(fs.doc(p.path).update(p.data));
   }
 
   /// Fully updates a document without the Command single-execution guard.
@@ -174,7 +193,7 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   /// Unlike [update], multiple calls can overlap safely.
   Future<void> updateDirect(({String path, T model}) input) {
     guardAuth();
-    return fs.doc(input.path).update(input.model.toJson());
+    return writeAckPolicy.applyVoid(fs.doc(input.path).update(input.model.toJson()));
   }
 
   /// Deletes a document without the Command single-execution guard.
@@ -182,7 +201,7 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   /// Unlike [delete], multiple calls can overlap safely.
   Future<void> deleteDirect(String path) {
     guardAuth();
-    return fs.doc(path).delete();
+    return writeAckPolicy.applyVoid(fs.doc(path).delete());
   }
 
   // ── lifecycle ─────────────────────────────────────────────────────────────
