@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.14.0
+
+### Added
+- **`initializeFromEmptyCache` (opt-in) on `FirestoreCollectionRepository`
+  and `FirestoreCollectionGroupRepository`.** The cache prime used to discard
+  a successful but empty cache read, and Firestore's `snapshots()` also
+  withholds an empty from-cache first event for a query it has never synced
+  while it believes it is online. So for a brand-new query (e.g. "today's
+  entries" on the first open of a day) `hasInitialized` stayed `false` until
+  the server answered, which after idle can take seconds (auth and App Check
+  token refresh). With `initializeFromEmptyCache: true`, an empty cache read
+  that **succeeds** marks the repo initialized at once:
+  - `hasInitialized` is `true`, `value` is `[]`, `isFromCache` is `true`.
+  - `isLoading` **stays `true`** until the server answers, so `showEmpty`
+    (and `isInitializing`) still wait for the server's verdict.
+  - A cache read that throws (no cache at all) still leaves the repo
+    uninitialized.
+  - A soft `refresh()` never clears already-shown data on an empty cache read.
+
+  **Why opt-in:** on a fresh install the cache is empty while the server may
+  hold documents. A UI that gates its empty state on `hasInitialized` alone
+  would flash that empty state until the data arrives. The default (`false`)
+  keeps the previous behavior exactly. Enable it for queries where an instant
+  empty state is worth that brief flash, or gate the empty state on
+  `showEmpty` / `!isLoading` / `!isFromCache` to avoid it.
+
 ## 1.13.0
 
 ### Added

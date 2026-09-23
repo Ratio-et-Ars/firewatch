@@ -258,6 +258,7 @@ final repo = FirestoreCollectionRepository<Item>(
 
 - `isLoading`: true while fetching/refreshing
 - `hasInitialized` (collections): first load completed
+  - With `initializeFromEmptyCache: true`, a successful but empty cache read also counts, while `isLoading` stays `true` until the server answers. Opt-in, because on a fresh install the cache is empty but the server may have documents; gate a strict empty state on `showEmpty`.
 - `lastError` / `hasError` (collections): last terminal fetch error, or `null` — lets you tell "load failed" apart from "genuinely empty" (`showEmpty` checks it for you)
 - `isFromCache` (collections): whether the latest snapshot came from the local cache (`metadata.isFromCache`) rather than the server — with persistence enabled, an offline fetch can resolve as a cached (possibly empty) snapshot instead of erroring
 - `hasMore` (collections): whether `loadMore()` can grow the window

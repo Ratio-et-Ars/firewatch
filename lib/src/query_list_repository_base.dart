@@ -93,6 +93,7 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
     FirewatchErrorHandler? onError,
     int maxRetries = 0,
     Duration retryDelay = const Duration(milliseconds: 500),
+    bool initializeFromEmptyCache = false,
   })  : fs = firestore ?? FirebaseFirestore.instance,
         _fromJson = fromJson,
         _authUid = authUid,
@@ -105,6 +106,7 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
         _onError = onError,
         _maxRetries = maxRetries,
         _retryDelay = retryDelay,
+        _initializeFromEmptyCache = initializeFromEmptyCache,
         super(const []) {
     _authUid?.addListener(_triggerRebuild);
     for (final d in _deps) {
@@ -124,6 +126,7 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
   final List<Listenable> _deps;
   final int _maxRetries;
   final Duration _retryDelay;
+  final bool _initializeFromEmptyCache;
   int _retryCount = 0;
 
   final ValueNotifier<QueryMutator?> _queryNotifier;
@@ -148,6 +151,9 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
   final ValueNotifier<bool> isLoading = ValueNotifier<bool>(true);
 
   /// Whether the repository has completed its first query.
+  ///
+  /// With `initializeFromEmptyCache: true`, a successful but empty cache read
+  /// also sets this, while [isLoading] stays `true` until the server answers.
   final ValueNotifier<bool> hasInitialized = ValueNotifier<bool>(false);
 
   /// The last terminal fetch error, or `null` when the most recent fetch
@@ -383,6 +389,8 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
       if (ep != epoch) return; // stale
       if (cacheSnap.docs.isNotEmpty) {
         _handleSnap(cacheSnap);
+      } else if (_initializeFromEmptyCache) {
+        _markInitializedFromEmptyCache();
       }
     } catch (_) {
       if (ep != epoch) return;
@@ -484,6 +492,22 @@ abstract class QueryListRepositoryBase<T extends JsonModel>
       isLoading.value = false;
       hasInitialized.value = true;
     }
+  }
+
+  /// Opt-in ([_initializeFromEmptyCache]): a *successful* but empty cache read
+  /// counts as the first load, so an empty-state UI keyed on [hasInitialized]
+  /// need not wait on the network. Firestore's `snapshots()` withholds an
+  /// empty from-cache first event for a never-synced query while it believes
+  /// it is online, so without this the repo stays uninitialized until the
+  /// server answers.
+  ///
+  /// [isLoading] stays `true` and [isFromCache] is set, so [showEmpty] stays
+  /// `false` until the server confirms: the server may still hold documents
+  /// the cache has never seen (e.g. a fresh install).
+  void _markInitializedFromEmptyCache() {
+    if (hasInitialized.value) return; // soft refresh: keep what is shown
+    isFromCache.value = true;
+    hasInitialized.value = true;
   }
 
   void _handleSnap(QuerySnapshot<Map<String, dynamic>> snap) {
