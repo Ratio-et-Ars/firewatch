@@ -75,6 +75,14 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   ///   live Firestore updates. If false, fetches a one-shot snapshot only.
   /// - [pageSize]: Initial page size for paginated queries (default: 25).
   /// - [paginate]: If true (default), enables pagination via `loadMore()`.
+  /// - [initializeFromEmptyCache]: If true, a successful but empty local-cache
+  ///   read marks the repo [hasInitialized] without waiting for the server;
+  ///   [isLoading] stays `true` and [isFromCache] is `true` until the server
+  ///   answers, so [showEmpty] waits for confirmation. Default `false`: the
+  ///   repo stays uninitialized until the server answers. Enable it when an
+  ///   empty state keyed on [hasInitialized] should appear at once for a
+  ///   query the cache has never seen, and a brief empty state is acceptable
+  ///   on a fresh install whose cache is empty but whose server has data.
   /// - [writeAckPolicy]: How long writes wait for the Firestore **server ack**
   ///   before resolving optimistically. The default awaits the ack
   ///   indefinitely (legacy behavior); pass an [WriteAckPolicy.ackGrace] of
@@ -90,6 +98,7 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
     super.pageSize,
     super.paginate,
     super.onError,
+    super.initializeFromEmptyCache,
     this.writeAckPolicy = const WriteAckPolicy(),
   }) : _queryRefBuilder = queryRefBuilder {
     start();
