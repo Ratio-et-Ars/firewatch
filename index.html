@@ -275,7 +275,11 @@ fetch errors:</p>
 <h2 id="ui-state">UI State</h2>
 <ul>
 <li><code>isLoading</code>: true while fetching/refreshing</li>
-<li><code>hasInitialized</code> (collections): first load completed</li>
+<li><code>hasInitialized</code> (collections): first load completed
+<ul>
+<li>With <code>initializeFromEmptyCache: true</code>, a successful but empty cache read also counts, while <code>isLoading</code> stays <code>true</code> until the server answers. Opt-in, because on a fresh install the cache is empty but the server may have documents; gate a strict empty state on <code>showEmpty</code>.</li>
+</ul>
+</li>
 <li><code>lastError</code> / <code>hasError</code> (collections): last terminal fetch error, or <code>null</code> — lets you tell "load failed" apart from "genuinely empty" (<code>showEmpty</code> checks it for you)</li>
 <li><code>isFromCache</code> (collections): whether the latest snapshot came from the local cache (<code>metadata.isFromCache</code>) rather than the server — with persistence enabled, an offline fetch can resolve as a cached (possibly empty) snapshot instead of erroring</li>
 <li><code>hasMore</code> (collections): whether <code>loadMore()</code> can grow the window</li>
@@ -325,7 +329,7 @@ fetch errors:</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.13.0
+      1.14.0
   </span>
   
 </footer>
