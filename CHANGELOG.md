@@ -8,10 +8,10 @@
   whose `onTimeout` callback is type-checked against the future's *runtime*
   type. cloud_firestore_web returns raw `JSPromise.toDart` futures from
   `DocumentReference.delete()` and `WriteBatch.commit()`: typed
-  `Future<void>`, but `Future<JSAny?>` at runtime. dart2wasm enforces the
-  check and threw `Runtime type check failed` from every repo delete
-  (collection, doc and collection-group) and every batch op (`batchAdd`,
-  `batchSet`, `batchUpdate`, `batchDelete`). The policy now re-wraps the
+  `Future<void>`, but `Future<JSAny?>` at runtime. Sound runtimes, including
+  dart2wasm, enforce the check, so web threw `Runtime type check failed`
+  from every repo delete (collection, doc and collection-group) and every
+  batch op (`batchAdd`, `batchSet`, `batchUpdate`, `batchDelete`). The policy now re-wraps the
   write as an exact `Future<T>` before the timeout, so any caller is covered.
   Values and errors pass through unchanged; behavior on mobile and with the
   default (no-grace) policy is unchanged.
