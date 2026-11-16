@@ -92,9 +92,21 @@ way. With a <code>null</code> <a href="../../firewatch/WriteAckPolicy/ackGrace.h
   final grace = ackGrace;
   if (grace == null) return write;
 
+  &#47;&#47; Re-wrap so the future&#39;s runtime type is exactly `Future&lt;T&gt;`. A write
+  &#47;&#47; future can be a subtype at runtime: on web, cloud_firestore_web returns
+  &#47;&#47; raw `JSPromise.toDart` futures from `DocumentReference.delete()` and
+  &#47;&#47; `WriteBatch.commit()`, typed `Future&lt;void&gt;` but `Future&lt;JSAny?&gt;` at
+  &#47;&#47; runtime. `Future.timeout`&#39;s `onTimeout` is checked against the runtime
+  &#47;&#47; type, so on sound runtimes, including dart2wasm, our `T Function()`
+  &#47;&#47; callback fails there (&quot;type &#39;() =&gt; void&#39; is not a subtype of type
+  &#47;&#47; &#39;(() =&gt; FutureOr&lt;JSAny?&gt;)?&#39;&quot;). `then&lt;T&gt;` yields a real `Future&lt;T&gt;`;
+  &#47;&#47; errors pass through unchanged (no onError).
+  write = write.then&lt;T&gt;((value) =&gt; value);
+
   var resolvedOptimistically = false;
   if (onPostGraceError != null) {
-    &#47;&#47; Watch the original write fire-and-forget. Pre-grace errors throw
+    &#47;&#47; Watch the (re-wrapped) write fire-and-forget; it settles exactly as
+    &#47;&#47; the original does. Pre-grace errors throw
     &#47;&#47; through the returned (timed-out) future below and are NOT reported
     &#47;&#47; here; only errors landing after the optimistic resolve are routed to
     &#47;&#47; the callback. This listener also guarantees the error is handled, so
@@ -141,7 +153,7 @@ way. With a <code>null</code> <a href="../../firewatch/WriteAckPolicy/ackGrace.h
 <footer>
   <span class="no-break">
     firewatch
-      1.14.0
+      1.14.1
   </span>
   
 </footer>
