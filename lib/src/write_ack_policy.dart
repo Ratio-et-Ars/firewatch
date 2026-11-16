@@ -91,9 +91,21 @@ class WriteAckPolicy {
     final grace = ackGrace;
     if (grace == null) return write;
 
+    // Re-wrap so the future's runtime type is exactly `Future<T>`. A write
+    // future can be a subtype at runtime: on web, cloud_firestore_web returns
+    // raw `JSPromise.toDart` futures from `DocumentReference.delete()` and
+    // `WriteBatch.commit()`, typed `Future<void>` but `Future<JSAny?>` at
+    // runtime. `Future.timeout`'s `onTimeout` is checked against the runtime
+    // type, so on sound runtimes, including dart2wasm, our `T Function()`
+    // callback fails there ("type '() => void' is not a subtype of type
+    // '(() => FutureOr<JSAny?>)?'"). `then<T>` yields a real `Future<T>`;
+    // errors pass through unchanged (no onError).
+    write = write.then<T>((value) => value);
+
     var resolvedOptimistically = false;
     if (onPostGraceError != null) {
-      // Watch the original write fire-and-forget. Pre-grace errors throw
+      // Watch the (re-wrapped) write fire-and-forget; it settles exactly as
+      // the original does. Pre-grace errors throw
       // through the returned (timed-out) future below and are NOT reported
       // here; only errors landing after the optimistic resolve are routed to
       // the callback. This listener also guarantees the error is handled, so

@@ -37,7 +37,7 @@ class _HungDocRef implements DocumentReference<Map<String, dynamic>> {
   @override
   Future<void> delete() {
     _backend.log.add('delete:$id');
-    return _backend.ack.future;
+    return _backend.rawAck;
   }
 
   @override
@@ -66,6 +66,20 @@ class _HungBackend {
   /// Monotonic counter for locally-minted doc IDs, shared across the
   /// collection-ref instances the builder hands out.
   int autoId = 0;
+
+  /// When true, [rawAck] mimics cloud_firestore_web on dart2wasm, whose
+  /// `DocumentReference.delete()` and `WriteBatch.commit()` return a raw
+  /// `JSPromise.toDart` future: typed `Future<void>`, but `Future<JSAny?>` at
+  /// runtime. `Future<int?>` is the VM stand-in for `Future<JSAny?>`.
+  bool jsLike = false;
+  /// The future returned by delete/commit: [ack]'s, or a JS-like
+  /// `Future<int?>` that settles with it.
+  Future<void> get rawAck {
+    if (!jsLike) return ack.future;
+    final js = Completer<int?>();
+    ack.future.then((_) => js.complete(null), onError: js.completeError);
+    return js.future;
+  }
 }
 
 // ignore: subtype_of_sealed_class
@@ -123,7 +137,7 @@ class _HungBatch implements WriteBatch {
   @override
   Future<void> commit() {
     _backend.log.add('commit');
-    return _backend.ack.future;
+    return _backend.rawAck;
   }
 
   @override
@@ -312,6 +326,57 @@ void main() {
       await policy.applyVoid(write.future);
       sw.stop();
       expect(sw.elapsed, lessThan(const Duration(seconds: 1)));
+    });
+
+    // dart2wasm regression: a write future whose runtime type is narrower
+    // than its static type (cloud_firestore_web's raw `Future<JSAny?>` typed
+    // `Future<void>`) made `Future.timeout`'s covariant `onTimeout` check
+    // throw "type '() => void' is not a subtype of type
+    // '(() => FutureOr<int?>)?'". The policy must accept such futures.
+    test('graced applyVoid accepts a Future<int?> typed as Future<void>',
+        () async {
+      const policy = WriteAckPolicy(ackGrace: _grace);
+
+      // Hung: resolves optimistically at the grace.
+      final hung = Completer<int?>();
+      final Future<void> hungWrite = hung.future;
+      await policy.applyVoid(hungWrite);
+
+      // Acked before the grace.
+      final Future<void> ackedWrite = Future<int?>.value(1);
+      await policy.applyVoid(ackedWrite);
+
+      // Pre-grace error still throws.
+      final failing = Completer<int?>();
+      final Future<void> failingWrite = failing.future;
+      final applied =
+          const WriteAckPolicy(ackGrace: _wellPastGrace).applyVoid(failingWrite);
+      failing.completeError(Exception('permission-denied'));
+      await expectLater(applied, throwsException);
+
+      // Post-grace error is still routed to the handler.
+      final late = Completer<int?>();
+      final Future<void> lateWrite = late.future;
+      final reported = <Object>[];
+      await policy.applyVoid(lateWrite,
+          onPostGraceError: (e, _) => reported.add(e));
+      final rejection = Exception('late');
+      late.completeError(rejection);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(reported, [rejection]);
+    });
+
+    test('graced apply<T> keeps T for a narrower runtime future', () async {
+      const policy = WriteAckPolicy(ackGrace: _grace);
+
+      // Settles before the grace: the real value comes back, typed T.
+      final Future<num> acked = Future<int>.value(7);
+      final Future<num> result = policy.apply<num>(acked, onTimeout: () => 1.5);
+      expect(await result, 7);
+
+      // Times out: onTimeout's T value (a double, not an int) comes back.
+      final Future<num> hung = Completer<int>().future;
+      expect(await policy.apply<num>(hung, onTimeout: () => 1.5), 1.5);
     });
 
     test('value equality, hashCode, toString', () {
@@ -520,6 +585,28 @@ void main() {
       repo.dispose();
     });
 
+    test(
+        'graced delete + batch ops resolve when the backend returns '
+        'JS-like futures (dart2wasm raw JSPromise.toDart)', () async {
+      final backend = _HungBackend()..jsLike = true;
+      final repo = buildRepo(
+        backend,
+        policy: const WriteAckPolicy(ackGrace: _grace),
+        firestore: _HungBatchFirestore(backend),
+      );
+
+      await repo.deleteDirect('a');
+      await repo.delete.runAsync('b');
+      expect(repo.delete.errors.value, isNull);
+      await repo.batchSet.runAsync([Item(id: 'c', n: 1)]);
+      await repo.batchDelete.runAsync(['d']);
+      expect(repo.batchSet.errors.value, isNull);
+      expect(repo.batchDelete.errors.value, isNull);
+
+      expect(backend.log, ['delete:a', 'delete:b', 'commit', 'commit']);
+      repo.dispose();
+    });
+
     test('default-policy batch commit hangs offline (legacy behavior)',
         () async {
       final backend = _HungBackend();
@@ -629,6 +716,25 @@ void main() {
     });
   });
 
+  group('FirestoreDocRepository + WriteAckPolicy (JS-like futures)', () {
+    test('graced delete resolves when delete() returns a JS-like future',
+        () async {
+      final backend = _HungBackend()..jsLike = true;
+      final repo = FirestoreDocRepository<Item>(
+        firestore: FakeFirebaseFirestore(),
+        fromJson: Item.fromJson,
+        docRefBuilder: (fs, uid) => _HungDocRef('the-doc', backend),
+        writeAckPolicy: const WriteAckPolicy(ackGrace: _grace),
+      );
+
+      await repo.deleteDirect();
+      await repo.delete.runAsync();
+      expect(repo.delete.errors.value, isNull);
+      expect(backend.log, ['delete:the-doc', 'delete:the-doc']);
+      repo.dispose();
+    });
+  });
+
   group('FirestoreCollectionGroupRepository + WriteAckPolicy', () {
     test(
         'BRICKING REGRESSION: graced group set Command recovers after timeout',
@@ -648,6 +754,22 @@ void main() {
       await repo.patch.runAsync((path: 'users/u1/tasks/t2', data: {'n': 2}));
 
       expect(backend.log, ['update:t1', 'update:t2']);
+      repo.dispose();
+    });
+
+    test('graced group delete resolves with a JS-like delete() future',
+        () async {
+      final backend = _HungBackend()..jsLike = true;
+      final repo = _HungDocGroupRepo(
+        backend: backend,
+        firestore: FakeFirebaseFirestore(),
+        authUid: ValueNotifier<String?>('u1'),
+      );
+
+      await repo.deleteDirect('users/u1/tasks/t1');
+      await repo.delete.runAsync('users/u1/tasks/t2');
+      expect(repo.delete.errors.value, isNull);
+      expect(backend.log, ['delete:t1', 'delete:t2']);
       repo.dispose();
     });
   });
