@@ -1,5 +1,45 @@
 # Changelog
 
+## 1.14.2
+
+### Fixed
+- **Write Commands no longer drop calls while an earlier write waits for its
+  ack.** Firestore applies a write to the local cache at once, but its future
+  completes only on the server ack: offline, not until connectivity returns.
+  The repositories' write Commands (`set`, `patch`, `update`, `delete`, `add`,
+  the batch Commands, and the doc and collection-group Commands) awaited that
+  future, and a `command_it` Command ignores `run()` while its previous run is
+  in flight. So with the default `WriteAckPolicy`, the first offline write held
+  its Command for the rest of the session and every later call was silently
+  dropped: not sent, not in the local cache, no error. Online, a second call
+  during the ack round-trip was dropped the same way, and even a graced policy
+  dropped calls made within the grace. Write Commands now send every call to
+  Firestore immediately, in call order, so each lands in the local cache at
+  once and writes to the same document keep their order. Each call still gets
+  its own Command execution, one at a time in call order, waiting for its own
+  ack:
+  - `isRunning` is `true` while any write is unacknowledged (it may report
+    `false` for one microtask between two queued writes).
+  - `runAsync(x)` completes with x's own outcome (for `add`, its own ID).
+    Before, a `runAsync` during an in-flight run returned the in-flight run's
+    future.
+  - Each failed write reports its own error through the Command's error filter
+    (`errors`, `results`, `Command.globalExceptionHandler`), as before.
+  - A write that throws while being built (no signed-in user) is reported the
+    same way and does not block the calls after it.
+
+  The field types are unchanged (`Command<…>`). `*Direct` methods are
+  unchanged.
+
+### Changed
+- **Batch Commands send every 500-op chunk at once**, in order, instead of
+  committing the next chunk only after the previous chunk's ack. Offline, a
+  list over 500 items used to send only its first chunk. A failing chunk no
+  longer stops the chunks after it (chunks were never atomic together); the
+  Command still throws the first failing chunk's error.
+- Requires `command_it` `^9.0.2` (was `^9.0.0`): write Commands extend
+  `CommandAsync`, whose constructor took its current shape in 9.0.2.
+
 ## 1.14.1
 
 ### Fixed

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'json_model.dart';
 import 'query_list_repository_base.dart';
 import 'write_ack_policy.dart';
+import 'write_command.dart';
 
 /// A builder function that produces a Firestore [Query] for a collection group.
 ///
@@ -132,17 +133,17 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
 
   // ── CRUD (by document path) ─────────────────────────────────────────────
   //
-  // Every write runs under [writeAckPolicy] *inside* the Command function, so
-  // with a graced policy the Command completes within the grace even offline
-  // and command_it's single-execution guard recovers — a hung server ack can
-  // never brick the Command for the session.
+  // Every write Command sends each call to Firestore at once, even while an
+  // earlier write is still waiting for its server ack (see `WriteCommand`),
+  // so no call is dropped. Each write runs under [writeAckPolicy].
 
   /// Creates or merges a document at a specific path.
   ///
   /// Input: A record with `path` (full document path) and `model` (a [T]).
   /// Behavior: Writes `model.toJson()` at the document path,
   /// merging with existing data if present.
-  late final set = Command.createAsyncNoResult<({String path, T model})>(
+  late final Command<({String path, T model}), void> set =
+      WriteCommand.noResult<({String path, T model})>(
     (r) {
       guardAuth();
       return _ackVoid(
@@ -155,7 +156,8 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   ///
   /// Input: A record with `path` (full document path) and `model` (a [T]).
   /// Behavior: Calls `.update()` with the entire serialized model.
-  late final update = Command.createAsyncNoResult<({String path, T model})>(
+  late final Command<({String path, T model}), void> update =
+      WriteCommand.noResult<({String path, T model})>(
     (r) {
       guardAuth();
       return _ackVoid(fs.doc(r.path).update(r.model.toJson()));
@@ -166,7 +168,8 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   ///
   /// Input: A [GroupPatch] containing a `path` and `data` map.
   /// Behavior: Only the provided fields are updated.
-  late final patch = Command.createAsyncNoResult<GroupPatch>(
+  late final Command<GroupPatch, void> patch =
+      WriteCommand.noResult<GroupPatch>(
     (r) {
       guardAuth();
       return _ackVoid(fs.doc(r.path).update(r.data));
@@ -176,18 +179,19 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
   /// Deletes a document by its full path.
   ///
   /// Input: A full document path string.
-  late final delete = Command.createAsyncNoResult<String>(
+  late final Command<String, void> delete =
+      WriteCommand.noResult<String>(
     (path) {
       guardAuth();
       return _ackVoid(fs.doc(path).delete());
     },
   );
 
-  // ── direct writes (concurrent-safe, bypass Command guard) ────────────────
+  // ── direct writes (plain Futures, no Command) ─────────────────────────────
 
-  /// Creates or merges a document without the Command single-execution guard.
+  /// Creates or merges a document as a plain Future, outside the Command.
   ///
-  /// Unlike [set], multiple calls can overlap safely.
+  /// Like [set], multiple calls can overlap safely.
   Future<void> setDirect(({String path, T model}) input) {
     guardAuth();
     return _ackVoid(
@@ -195,26 +199,27 @@ class FirestoreCollectionGroupRepository<T extends JsonModel>
     );
   }
 
-  /// Partially updates fields without the Command single-execution guard.
+  /// Partially updates fields as a plain Future, outside the Command.
   ///
-  /// Unlike [patch], multiple calls can overlap safely — use this when
-  /// rapidly editing different documents in the same collection group.
+  /// Like [patch], multiple calls can overlap safely. Use this when you
+  /// want the write's own Future (its ack, or its error) instead of the
+  /// Command's shared state.
   Future<void> patchDirect(GroupPatch p) {
     guardAuth();
     return _ackVoid(fs.doc(p.path).update(p.data));
   }
 
-  /// Fully updates a document without the Command single-execution guard.
+  /// Fully updates a document as a plain Future, outside the Command.
   ///
-  /// Unlike [update], multiple calls can overlap safely.
+  /// Like [update], multiple calls can overlap safely.
   Future<void> updateDirect(({String path, T model}) input) {
     guardAuth();
     return _ackVoid(fs.doc(input.path).update(input.model.toJson()));
   }
 
-  /// Deletes a document without the Command single-execution guard.
+  /// Deletes a document as a plain Future, outside the Command.
   ///
-  /// Unlike [delete], multiple calls can overlap safely.
+  /// Like [delete], multiple calls can overlap safely.
   Future<void> deleteDirect(String path) {
     guardAuth();
     return _ackVoid(fs.doc(path).delete());
