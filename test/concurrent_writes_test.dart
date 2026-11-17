@@ -188,6 +188,27 @@ class Item implements JsonModel {
 Future<void> _settle() =>
     Future<void>.delayed(const Duration(milliseconds: 20));
 
+/// Waits until [condition] holds, failing after [timeout]. Command
+/// executions take a few event-loop turns each (command_it awaits
+/// `Future.delayed(Duration.zero)` around every run), and on the web those
+/// are clamped browser timers, so a fixed pump is not enough.
+Future<void> _until(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  final sw = Stopwatch()..start();
+  while (!condition()) {
+    if (sw.elapsed > timeout) {
+      fail('condition not met within $timeout');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 2));
+  }
+}
+
+/// Waits until [command] has finished every queued write.
+Future<void> _drained(Command<Object?, Object?> command) =>
+    _until(() => !command.isRunningSync.value && !command.isRunning.value);
+
 /// True once [future] has settled (successfully or with an error).
 Future<bool> _settledWithin(Future<void> future, Duration window) async {
   var settled = false;
@@ -247,8 +268,7 @@ void main() {
         );
 
         server.ackAll();
-        await _settle();
-        expect(repo.set.isRunning.value, isFalse);
+        await _drained(repo.set);
         repo.dispose();
       },
     );
@@ -339,8 +359,7 @@ void main() {
         final id2 = await f2;
         expect(local[id1], {'n': 1});
         expect(local[id2], {'n': 2});
-        await _settle();
-        expect(repo.add.isRunning.value, isFalse);
+        await _drained(repo.add);
         repo.dispose();
       },
     );
@@ -405,6 +424,9 @@ void main() {
         await _settle();
         repo.dispose();
       },
+      // fake_cloud_firestore is slow with 500+ documents on the web (this
+      // takes over 30s under dart2wasm), not a hang.
+      timeout: const Timeout(Duration(minutes: 3)),
     );
 
     test('writes to the same document keep their call order', () async {
@@ -431,10 +453,9 @@ void main() {
         repo.set(Item(id: 'a', n: 1));
         repo.set(Item(id: 'b', n: 2));
         repo.set(Item(id: 'c', n: 3));
-        await Future<void>.delayed(const Duration(milliseconds: 200));
+        await _drained(repo.set);
 
         expect(server.log, ['set:a', 'set:b', 'set:c']);
-        expect(repo.set.isRunning.value, isFalse);
         repo.dispose();
       },
     );
@@ -453,6 +474,8 @@ void main() {
       final late1 = Exception('late rejection 1');
       server.rejections.addAll([late1, Exception('late rejection 2')]);
       server.ackAll();
+      await _until(() => seen.isNotEmpty);
+      // Give a wrongly reported queued write time to show up too.
       await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(server.log, ['set:a', 'set:b']);
       // The execution already running reports its error the way a plain
@@ -501,8 +524,7 @@ void main() {
 
         server.ackOldest();
         await second;
-        await _settle();
-        expect(repo.set.isRunning.value, isFalse);
+        await _drained(repo.set);
         repo.dispose();
       },
     );
@@ -534,12 +556,33 @@ void main() {
         repo.set(Item(id: 'c', n: 3));
         await _settle();
         server.ackAll();
-        await _settle();
+        await _drained(repo.set);
 
         expect(server.log, ['set:a', 'set:b', 'set:c']);
         expect(errors, [denied, denied2]);
         expect(params, ['a', 'b']);
-        expect(repo.set.isRunning.value, isFalse);
+
+        // The Command really drained: a 4th write after the failures still
+        // runs, and its own failure is still reported.
+        final denied3 = FirebaseException(
+          plugin: 'cloud_firestore',
+          code: 'aborted',
+        );
+        server.rejections.add(denied3);
+        repo.set(Item(id: 'd', n: 4));
+        expect(server.log.last, 'set:d');
+        expect(repo.set.isRunningSync.value, isTrue);
+        server.ackAll();
+        await _drained(repo.set);
+        expect(errors, [denied, denied2, denied3]);
+        expect(params, ['a', 'b', 'd']);
+
+        // ...and a 5th, successful one completes normally.
+        final fifth = repo.set.runAsync(Item(id: 'e', n: 5));
+        server.ackAll();
+        await fifth;
+        await _drained(repo.set);
+        expect(errors, hasLength(3));
         repo.dispose();
       },
     );
@@ -578,7 +621,7 @@ void main() {
         repo.delete('b');
         await _settle();
         server.ackAll();
-        await _settle();
+        await _drained(repo.delete);
 
         expect(seen, [e1, e2]);
         repo.dispose();
@@ -603,13 +646,12 @@ void main() {
       repo.set(Item(id: 'a', n: 1)); // signed out: throws StateError
       auth.value = 'u1';
       repo.set(Item(id: 'b', n: 2));
-      await _settle();
+      await _until(() => errors.isNotEmpty);
 
       expect(errors.single, isA<StateError>());
       expect(server.log, ['set:b']);
       server.ackAll();
-      await _settle();
-      expect(repo.set.isRunning.value, isFalse);
+      await _drained(repo.set);
       repo.dispose();
     });
   });
@@ -677,8 +719,7 @@ void main() {
       expect(await stored(), isNull);
       expect(repo.delete.isRunning.value, isTrue);
       server.ackAll();
-      await _settle();
-      expect(repo.delete.isRunning.value, isFalse);
+      await _drained(repo.delete);
       repo.dispose();
     });
   });

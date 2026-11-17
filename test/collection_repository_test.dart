@@ -1237,6 +1237,8 @@ void main() {
 
   // ── chunking boundary ──────────────────────────────────────────────────
 
+  // fake_cloud_firestore is slow with 500+ documents on the web: ~20s on
+  // Chrome and over 30s under dart2wasm, on main too. Not a hang.
   test('batchDelete chunks correctly at the batch limit boundary', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>('u1');
@@ -1269,8 +1271,10 @@ void main() {
     expect(repo.value, isEmpty);
 
     repo.dispose();
-  });
+  }, timeout: const Timeout(Duration(minutes: 3)));
 
+  // fake_cloud_firestore is slow with 500+ documents on the web: ~20s on
+  // Chrome and over 30s under dart2wasm, on main too. Not a hang.
   test('batchAdd chunks correctly at the batch limit boundary', () async {
     final fs = FakeFirebaseFirestore();
     final authUid = ValueNotifier<String?>('u1');
@@ -1295,7 +1299,7 @@ void main() {
     expect(repo.value.length, count);
 
     repo.dispose();
-  });
+  }, timeout: const Timeout(Duration(minutes: 3)));
 
   // ── batch operations on public collections ──────────────────────────────
 
