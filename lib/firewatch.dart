@@ -7,7 +7,9 @@
 ///   single-item CRUD operations
 /// - Batch methods (`batchAdd`, `batchSet`, `batchPatch`, `batchUpdate`,
 ///   `batchDelete`) for multi-document writes via `WriteBatch` (atomic per
-///   500-op chunk; longer lists commit as multiple sequential batches)
+///   500-op chunk; longer lists commit as multiple batches)
+/// - Write Commands never drop a call: each call is sent to Firestore at once,
+///   even while earlier writes wait for the server ack (e.g. offline)
 /// - `WriteAckPolicy` for offline-safe writes: cap how long writes await the
 ///   server ack, resolving optimistically once queued locally, and `create()`
 ///   for locally-minted document IDs that resolve offline

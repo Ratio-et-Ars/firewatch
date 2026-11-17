@@ -16,13 +16,12 @@ import 'json_model.dart';
 /// does not complete until connectivity returns — potentially **never** within
 /// the app session.
 ///
-/// That interacts badly with `command_it` Commands: a Command whose wrapped
-/// function never completes stays `isRunning` forever, `run()` silently no-ops
-/// while a previous execution is in flight, and `runAsync()` returns the
-/// original hung future. Because repositories are typically cached (in a
-/// registry or DI container), **one offline write permanently bricks that
-/// Command for the rest of the session** — every later invocation is silently
-/// dropped.
+/// Before 1.14.2 that also bricked the repositories' write Commands: a plain
+/// `command_it` Command ignores `run()` while a previous execution is in
+/// flight, so one offline write silently dropped every later call. Write
+/// Commands now send every call at once, so that no longer happens under any
+/// policy; but a Command's `isRunning` and `runAsync()` still wait for the
+/// ack, and the grace still bounds how long that is.
 ///
 /// ## Semantics
 ///

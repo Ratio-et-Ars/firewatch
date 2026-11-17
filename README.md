@@ -193,14 +193,39 @@ allFriendsRepo.patch((path: 'users/abc123/friends/f1', data: {'name': 'Bob'}));
 allFriendsRepo.delete('users/abc123/friends/f1');
 ```
 
-### Direct writes (concurrent-safe)
+### Rapid and offline writes
 
-Commands are single-execution — a second call while the first is in-flight is
-silently dropped. When you need to rapidly write to **different documents** in
-the same collection (e.g. toggling checkboxes), use the `*Direct` methods:
+Firestore applies a write to the local cache at once, but the write's future
+completes only when the **server** acknowledges it — offline, not until
+connectivity returns. Write Commands never drop a call while an earlier write
+waits for its ack: every call is sent to Firestore immediately, in call order,
+so it shows up in local reads and listeners right away and writes to the same
+document keep their order.
 
 ```dart
-// These return Futures and can overlap safely:
+// Offline: all three land in the local cache and sync later.
+groceriesRepo.set(milk);
+groceriesRepo.set(eggs);
+groceriesRepo.set(bread);
+```
+
+Each call still gets its own Command execution, one at a time in call order,
+and each waits for its own ack:
+
+- `isRunning` is `true` while any write is unacknowledged (offline, that can
+  be for a long time; pass a `writeAckPolicy` with an `ackGrace` to bound
+  it). It may report `false` for one microtask between two queued writes.
+- `runAsync(x)` completes with **x's own** outcome (for `add`, its own ID).
+- A failed write reports its own error through the Command's error filter
+  (`errors`, `results`, `Command.globalExceptionHandler`), as before.
+
+> Before 1.14.2, a Command ignored calls while its previous write was in
+> flight, so offline every write after the first was silently dropped.
+
+The `*Direct` methods return the write's own `Future` instead of going through
+a Command:
+
+```dart
 await friendsRepo.patchDirect((id: 'f1', data: {'checked': true}));
 await friendsRepo.patchDirect((id: 'f2', data: {'checked': false}));
 
@@ -214,10 +239,10 @@ Collection repos expose `batchAdd` / `batchSet` / `batchPatch` / `batchUpdate` /
 
 > **Atomicity is per chunk, not per call.** A single `WriteBatch` is limited to
 > 500 operations, so a list longer than 500 is committed as **multiple
-> sequential batches**. Each batch is atomic on its own, but if a later chunk
-> fails, earlier chunks are already committed — the call is **not** all-or-
-> nothing across the 500-op boundary. Keep batches ≤ 500 items if you need true
-> atomicity.
+> batches**, all sent at once in order. Each batch is atomic on its own, but a
+> failing chunk does not undo or stop the others — the call is **not**
+> all-or-nothing across the 500-op boundary. Keep batches ≤ 500 items if you
+> need true atomicity.
 
 ## Caching & freshness
 

@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'json_model.dart';
 import 'query_list_repository_base.dart';
 import 'write_ack_policy.dart';
+import 'write_command.dart';
 
 /// A small, opinionated single-document repository that:
 /// 1) Reacts to auth changes (attaches/detaches via UID),
@@ -271,16 +272,16 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   // signed in as user A, written after switching to user B, lands at B's path.
   // Re-derive the data for the new user, or recreate the repo, on sign-in.
   //
-  // Every write runs under [writeAckPolicy] *inside* the Command function, so
-  // with a graced policy the Command completes within the grace even offline
-  // and command_it's single-execution guard recovers — a hung server ack can
-  // never brick the Command for the session.
+  // Every write Command sends each call to Firestore at once, even while an
+  // earlier write is still waiting for its server ack (see `WriteCommand`),
+  // so no call is dropped. Each write runs under [writeAckPolicy].
 
   /// Creates or merges a document with the full model.
   ///
   /// Uses `set` with `merge: true`, so existing fields not present in
   /// [model] are preserved. Throws [StateError] if not authenticated.
-  late final write = Command.createAsyncNoResult<T>(
+  late final Command<T, void> write =
+      WriteCommand.noResult<T>(
     (T model) => _ackVoid(
       _docOrThrow().set(model.toJson(), SetOptions(merge: true)),
     ),
@@ -290,7 +291,8 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   ///
   /// Unlike [write], this fails if the document does not already exist.
   /// Throws [StateError] if not authenticated.
-  late final update = Command.createAsyncNoResult<T>(
+  late final Command<T, void> update =
+      WriteCommand.noResult<T>(
     (T model) => _ackVoid(_docOrThrow().update(model.toJson())),
   );
 
@@ -302,7 +304,8 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   /// This uses Firestore `.update()` and **fails with `not-found` if the
   /// document does not yet exist**. Use [setFields] when you want
   /// partial-upsert semantics (create-if-missing).
-  late final patch = Command.createAsyncNoResult<Map<String, dynamic>>(
+  late final Command<Map<String, dynamic>, void> patch =
+      WriteCommand.noResult<Map<String, dynamic>>(
     (map) => _ackVoid(_docOrThrow().update(map)),
   );
 
@@ -317,7 +320,8 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   /// write where the doc may not have been initialized yet.
   ///
   /// Throws [StateError] if not authenticated.
-  late final setFields = Command.createAsyncNoResult<Map<String, dynamic>>(
+  late final Command<Map<String, dynamic>, void> setFields =
+      WriteCommand.noResult<Map<String, dynamic>>(
     (map) =>
         _ackVoid(_docOrThrow().set(map, SetOptions(merge: true))),
   );
@@ -325,47 +329,48 @@ class FirestoreDocRepository<T extends JsonModel> extends ValueNotifier<T?>
   /// Deletes the document.
   ///
   /// Throws [StateError] if not authenticated.
-  late final delete = Command.createAsyncNoParamNoResult(
+  late final Command<void, void> delete = WriteCommand.noParamNoResult(
     () => _ackVoid(_docOrThrow().delete()),
   );
 
-  // ── direct writes (concurrent-safe, bypass Command guard) ────────────────
+  // ── direct writes (plain Futures, no Command) ─────────────────────────────
 
-  /// Creates or merges the document with the full model, without the
-  /// Command single-execution guard.
+  /// Creates or merges the document with the full model, as a plain Future,
+  /// outside the Command.
   ///
-  /// Unlike [write], multiple calls can overlap safely — use this when
-  /// firing rapid successive writes (e.g. autosave during typing).
+  /// Like [write], multiple calls can overlap safely. Use this when you
+  /// want the write's own Future (its ack, or its error) instead of the
+  /// Command's shared state.
   Future<void> writeDirect(T model) => _ackVoid(
         _docOrThrow().set(model.toJson(), SetOptions(merge: true)),
       );
 
-  /// Fully updates the document with the full model, without the Command
-  /// single-execution guard.
+  /// Fully updates the document with the full model, as a plain Future,
+  /// outside the Command.
   ///
-  /// Unlike [update], multiple calls can overlap safely.
+  /// Like [update], multiple calls can overlap safely.
   /// Fails if the document does not exist.
   Future<void> updateDirect(T model) =>
       _ackVoid(_docOrThrow().update(model.toJson()));
 
-  /// Partially updates specific fields without the Command guard.
+  /// Partially updates specific fields as a plain Future, outside the Command.
   ///
-  /// Unlike [patch], multiple calls can overlap safely.
+  /// Like [patch], multiple calls can overlap safely.
   /// Fails if the document does not exist — use [setFieldsDirect] for
   /// partial-upsert semantics.
   Future<void> patchDirect(Map<String, dynamic> fields) =>
       _ackVoid(_docOrThrow().update(fields));
 
-  /// Partially sets specific fields without the Command guard, creating
+  /// Partially sets specific fields as a plain Future, outside the Command, creating
   /// the doc if missing.
   ///
-  /// Unlike [setFields], multiple calls can overlap safely.
+  /// Like [setFields], multiple calls can overlap safely.
   Future<void> setFieldsDirect(Map<String, dynamic> fields) =>
       _ackVoid(_docOrThrow().set(fields, SetOptions(merge: true)));
 
-  /// Deletes the document without the Command guard.
+  /// Deletes the document as a plain Future, outside the Command.
   ///
-  /// Unlike [delete], multiple calls can overlap safely.
+  /// Like [delete], multiple calls can overlap safely.
   Future<void> deleteDirect() =>
       _ackVoid(_docOrThrow().delete());
 

@@ -413,19 +413,20 @@ void main() {
         );
 
     test(
-        'default policy preserves legacy behavior: offline write hangs and the '
-        'Command silently drops the next invocation', () async {
+        'default policy: offline write hangs, and the next invocation is '
+        'still sent (no longer silently dropped)', () async {
       final backend = _HungBackend();
       final repo = buildRepo(backend);
 
       final first = repo.set.runAsync(Item(id: 'd1', n: 1));
       expect(await _settledWithin(first, _wellPastGrace), isFalse);
 
-      // Second invocation is silently dropped — THIS is the session-bricking
-      // bug the graced policy exists to fix.
+      // Before 1.14.2 this second invocation was silently dropped while the
+      // first write waited for its ack. Write Commands now send every call.
       repo.set.run(Item(id: 'd2', n: 2));
       await Future<void>.delayed(const Duration(milliseconds: 50));
-      expect(backend.log, ['set:d1']);
+      expect(backend.log, ['set:d1', 'set:d2']);
+      expect(repo.set.isRunning.value, isTrue);
 
       backend.ack.complete(); // let the hung future settle before teardown
       await first;

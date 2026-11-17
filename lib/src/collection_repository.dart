@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:command_it/command_it.dart';
 import 'package:flutter/foundation.dart';
@@ -5,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'json_model.dart';
 import 'query_list_repository_base.dart';
 import 'write_ack_policy.dart';
+import 'write_command.dart';
 
 /// A builder function that produces a typed Firestore collection reference.
 ///
@@ -129,11 +132,9 @@ class FirestoreCollectionRepository<T extends JsonModel>
 
   // ── CRUD (require signed-in user) ─────────────────────────────────────────
   //
-  // Every write below runs under [writeAckPolicy] *inside* the Command
-  // function. That placement is deliberate: with a graced policy the Command
-  // completes within the grace even offline, so command_it's single-execution
-  // guard recovers and a hung server ack can never brick the Command for the
-  // session.
+  // Every write Command sends each call to Firestore at once, even while an
+  // earlier write is still waiting for its server ack (see `WriteCommand`),
+  // so no call is dropped. Each write runs under [writeAckPolicy].
 
   /// Adds a new document to the collection.
   ///
@@ -145,10 +146,11 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// runs under [writeAckPolicy], so with a graced policy this resolves with
   /// the real ID even while offline. Prefer [create] in new code — it returns
   /// the ID directly without the Command wrapper.
-  late final add = Command.createAsync<Map<String, dynamic>, String?>(
-    (Map<String, dynamic> data) => create(data),
-    initialValue: null,
-  );
+  late final Command<Map<String, dynamic>, String?> add =
+      WriteCommand.withResult<Map<String, dynamic>, String?>(
+        (Map<String, dynamic> data) => create(data),
+        initialValue: null,
+      );
 
   /// Creates or replaces a document in the collection.
   ///
@@ -156,7 +158,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Behavior: Writes `model.toJson()` at the document path,
   /// merging with existing data if present.
   /// Example: `set(User(id: 'u1', name: 'Alice'));`
-  late final set = Command.createAsyncNoResult<T>(
+  late final Command<T, void> set = WriteCommand.noResult<T>(
     (T model) => _ackVoid(
       _colOrThrow().doc(model.id).set(model.toJson(), SetOptions(merge: true)),
     ),
@@ -167,7 +169,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Input: A [Patch] containing a `doc.id` and `data` map.
   /// Behavior: Only the provided fields are updated; other fields are untouched.
   /// Example: `patch((id: 'u1', data: {'name': 'Bob'}));`
-  late final patch = Command.createAsyncNoResult<Patch>(
+  late final Command<Patch, void> patch = WriteCommand.noResult<Patch>(
     (Patch p) =>
         _ackVoid(_colOrThrow().doc(p.id).update(p.data)),
   );
@@ -178,7 +180,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Behavior: Calls `.update()` with the entire serialized model,
   /// replacing all fields with `model.toJson()`.
   /// Example: `update(User(id: 'u1', name: 'Bob'));`
-  late final update = Command.createAsyncNoResult<T>(
+  late final Command<T, void> update = WriteCommand.noResult<T>(
     (T model) => _ackVoid(
       _colOrThrow().doc(model.id).update(model.toJson()),
     ),
@@ -189,7 +191,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// Input: A document ID string.
   /// Behavior: Removes the document at that path.
   /// Example: `delete(model.id);`
-  late final delete = Command.createAsyncNoResult<String>(
+  late final Command<String, void> delete = WriteCommand.noResult<String>(
     (String docId) =>
         _ackVoid(_colOrThrow().doc(docId).delete()),
   );
@@ -206,57 +208,58 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// queue and syncs when connectivity returns). With the default policy it
   /// behaves like `add` — resolving only on server ack.
   ///
-  /// Not a Command, so multiple calls can overlap safely.
+  /// Not a Command: returns the write's own Future.
   Future<String> create(Map<String, dynamic> data) async {
     final ref = _colOrThrow().doc();
     await _ackVoid(ref.set(data));
     return ref.id;
   }
 
-  // ── direct writes (concurrent-safe, bypass Command guard) ────────────────
+  // ── direct writes (plain Futures, no Command) ─────────────────────────────
 
-  /// Adds a document without the Command single-execution guard.
+  /// Adds a document as a plain Future, outside the Command.
   ///
-  /// Unlike [add], multiple calls can overlap safely.
+  /// Like [add], multiple calls can overlap safely.
   /// Returns the generated document ID.
   ///
   /// Alias of [create] — prefer [create] in new code.
   Future<String> addDirect(Map<String, dynamic> data) => create(data);
 
-  /// Creates or merges a document without the Command single-execution guard.
+  /// Creates or merges a document as a plain Future, outside the Command.
   ///
-  /// Unlike [set], multiple calls can overlap safely.
+  /// Like [set], multiple calls can overlap safely.
   Future<void> setDirect(T model) => _ackVoid(
         _colOrThrow().doc(model.id).set(model.toJson(), SetOptions(merge: true)),
       );
 
-  /// Partially updates fields without the Command single-execution guard.
+  /// Partially updates fields as a plain Future, outside the Command.
   ///
-  /// Unlike [patch], multiple calls can overlap safely — use this when
-  /// rapidly editing different documents in the same collection.
+  /// Like [patch], multiple calls can overlap safely. Use this when you
+  /// want the write's own Future (its ack, or its error) instead of the
+  /// Command's shared state.
   Future<void> patchDirect(Patch p) =>
       _ackVoid(_colOrThrow().doc(p.id).update(p.data));
 
-  /// Fully updates a document without the Command single-execution guard.
+  /// Fully updates a document as a plain Future, outside the Command.
   ///
-  /// Unlike [update], multiple calls can overlap safely.
+  /// Like [update], multiple calls can overlap safely.
   Future<void> updateDirect(T model) => _ackVoid(
         _colOrThrow().doc(model.id).update(model.toJson()),
       );
 
-  /// Deletes a document without the Command single-execution guard.
+  /// Deletes a document as a plain Future, outside the Command.
   ///
-  /// Unlike [delete], multiple calls can overlap safely.
+  /// Like [delete], multiple calls can overlap safely.
   Future<void> deleteDirect(String docId) =>
       _ackVoid(_colOrThrow().doc(docId).delete());
 
   // ── batch operations ─────────────────────────────────────────────────────
   //
   // Atomicity is per chunk, not per call: a WriteBatch is capped at [batchLimit]
-  // (500) operations, so a longer list commits as multiple sequential batches.
-  // If a later chunk fails, earlier chunks are already committed — these are
-  // NOT all-or-nothing across the 500-op boundary. Keep lists <= 500 if you
-  // need true atomicity.
+  // (500) operations, so a longer list commits as multiple batches, all sent
+  // at once in order. A failing chunk does not undo or stop the others —
+  // these are NOT all-or-nothing across the 500-op boundary. Keep lists <= 500
+  // if you need true atomicity.
 
   /// The maximum number of operations per Firestore [WriteBatch].
   static const batchLimit = 500;
@@ -265,20 +268,21 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// each chunk as a single [WriteBatch].
   ///
   /// Note: batches are atomic per chunk only. Lists exceeding [batchLimit] are
-  /// committed as multiple sequential batches, so a failure partway through
-  /// leaves earlier chunks committed.
+  /// committed as multiple batches, so a failing chunk leaves the others
+  /// committed.
   ///
-  /// Each chunk's `commit()` runs under [writeAckPolicy]: batches queue in
-  /// Firestore's local mutation store while offline but their commit futures
-  /// never complete, so an un-graced batch Command is just as brickable as a
-  /// single write. With a graced policy each chunk resolves within the grace
-  /// (so a multi-chunk call can take up to `chunks × grace` offline).
+  /// Every chunk is committed at once, in order, before any ack is awaited:
+  /// offline, a commit future never completes, so committing chunk 2 only
+  /// after chunk 1's ack would leave chunk 2 unsent, and a later write call
+  /// could overtake it. The returned future waits for every chunk (each under
+  /// [writeAckPolicy]) and throws the first failing chunk's error.
   Future<void> _runBatched<E>(
     List<E> items,
     void Function(WriteBatch batch, CollectionReference<Map<String, dynamic>> col, E item) populate,
   ) async {
     if (items.isEmpty) return;
     final col = _colOrThrow();
+    final commits = <Future<void>>[];
     for (var i = 0; i < items.length; i += batchLimit) {
       final end = i + batchLimit;
       final chunk = items.sublist(i, end < items.length ? end : items.length);
@@ -286,7 +290,14 @@ class FirestoreCollectionRepository<T extends JsonModel>
       for (final item in chunk) {
         populate(batch, col, item);
       }
-      await _ackVoid(batch.commit());
+      final commit = _ackVoid(batch.commit());
+      // Handled here so a chunk failing after an earlier one already threw
+      // never surfaces as an unhandled error.
+      unawaited(commit.then<void>((_) {}, onError: (Object _, StackTrace _) {}));
+      commits.add(commit);
+    }
+    for (final commit in commits) {
+      await commit;
     }
   }
 
@@ -297,7 +308,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   ///
   /// This is a [Command], so it exposes `isRunning`, `errors`, and can be
   /// awaited via `runAsync`. Lists exceeding [batchLimit] (500) are
-  /// automatically split into sequential batches.
+  /// automatically split into batches of 500.
   ///
   /// Example:
   /// ```dart
@@ -305,7 +316,8 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// // or await:
   /// await repo.batchAdd.runAsync([{'name': 'Alice'}, {'name': 'Bob'}]);
   /// ```
-  late final batchAdd = Command.createAsyncNoResult<List<Map<String, dynamic>>>(
+  late final Command<List<Map<String, dynamic>>, void> batchAdd =
+      WriteCommand.noResult<List<Map<String, dynamic>>>(
     (items) => _runBatched(items, (batch, col, data) => batch.set(col.doc(), data)),
   );
 
@@ -317,13 +329,14 @@ class FirestoreCollectionRepository<T extends JsonModel>
   ///
   /// This is a [Command], so it exposes `isRunning`, `errors`, and can be
   /// awaited via `runAsync`. Lists exceeding [batchLimit] (500) are
-  /// automatically split into sequential batches.
+  /// automatically split into batches of 500.
   ///
   /// Example:
   /// ```dart
   /// await repo.batchSet.runAsync([user1, user2]);
   /// ```
-  late final batchSet = Command.createAsyncNoResult<List<T>>(
+  late final Command<List<T>, void> batchSet =
+      WriteCommand.noResult<List<T>>(
     (models) => _runBatched(
       models,
       (batch, col, model) =>
@@ -339,7 +352,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   ///
   /// This is a [Command], so it exposes `isRunning`, `errors`, and can be
   /// awaited via `runAsync`. Lists exceeding [batchLimit] (500) are
-  /// automatically split into sequential batches.
+  /// automatically split into batches of 500.
   ///
   /// Example:
   /// ```dart
@@ -348,7 +361,8 @@ class FirestoreCollectionRepository<T extends JsonModel>
   ///   (id: 'u2', data: {'name': 'Bob'}),
   /// ]);
   /// ```
-  late final batchPatch = Command.createAsyncNoResult<List<Patch>>(
+  late final Command<List<Patch>, void> batchPatch =
+      WriteCommand.noResult<List<Patch>>(
     (patches) => _runBatched(patches, (batch, col, p) => batch.update(col.doc(p.id), p.data)),
   );
 
@@ -360,13 +374,14 @@ class FirestoreCollectionRepository<T extends JsonModel>
   ///
   /// This is a [Command], so it exposes `isRunning`, `errors`, and can be
   /// awaited via `runAsync`. Lists exceeding [batchLimit] (500) are
-  /// automatically split into sequential batches.
+  /// automatically split into batches of 500.
   ///
   /// Example:
   /// ```dart
   /// await repo.batchUpdate.runAsync([updatedUser1, updatedUser2]);
   /// ```
-  late final batchUpdate = Command.createAsyncNoResult<List<T>>(
+  late final Command<List<T>, void> batchUpdate =
+      WriteCommand.noResult<List<T>>(
     (models) => _runBatched(
       models,
       (batch, col, model) => batch.update(col.doc(model.id), model.toJson()),
@@ -377,7 +392,7 @@ class FirestoreCollectionRepository<T extends JsonModel>
   ///
   /// This is a [Command], so it exposes `isRunning`, `errors`, and can be
   /// awaited via `runAsync`. Lists exceeding [batchLimit] (500) are
-  /// automatically split into sequential batches.
+  /// automatically split into batches of 500.
   ///
   /// Example:
   /// ```dart
@@ -385,7 +400,8 @@ class FirestoreCollectionRepository<T extends JsonModel>
   /// // or await:
   /// await repo.batchDelete.runAsync(['id1', 'id2', 'id3']);
   /// ```
-  late final batchDelete = Command.createAsyncNoResult<List<String>>(
+  late final Command<List<String>, void> batchDelete =
+      WriteCommand.noResult<List<String>>(
     (docIds) => _runBatched(docIds, (batch, col, id) => batch.delete(col.doc(id))),
   );
 
