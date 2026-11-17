@@ -63,8 +63,8 @@
     </section>
     
 <section class="desc markdown">
-  <p>Partially updates specific fields without the Command guard.</p>
-<p>Unlike <a href="../../firewatch/FirestoreDocRepository/patch.html">patch</a>, multiple calls can overlap safely.
+  <p>Partially updates specific fields as a plain Future, outside the Command.</p>
+<p>Like <a href="../../firewatch/FirestoreDocRepository/patch.html">patch</a>, multiple calls can overlap safely.
 Fails if the document does not exist — use <a href="../../firewatch/FirestoreDocRepository/setFieldsDirect.html">setFieldsDirect</a> for
 partial-upsert semantics.</p>
 </section>
@@ -102,7 +102,7 @@ partial-upsert semantics.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

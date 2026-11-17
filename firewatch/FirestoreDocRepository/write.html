@@ -70,7 +70,8 @@
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final write = Command.createAsyncNoResult&lt;T&gt;(
+  <pre class="language-dart"><code class="language-dart">late final Command&lt;T, void&gt; write =
+    WriteCommand.noResult&lt;T&gt;(
   (T model) =&gt; _ackVoid(
     _docOrThrow().set(model.toJson(), SetOptions(merge: true)),
   ),
@@ -103,7 +104,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

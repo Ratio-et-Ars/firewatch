@@ -72,7 +72,7 @@ policy the returned future resolves with the ID within the grace even
 while offline (the write is durably queued in Firestore's local mutation
 queue and syncs when connectivity returns). With the default policy it
 behaves like <code>add</code> — resolving only on server ack.</p>
-<p>Not a Command, so multiple calls can overlap safely.</p>
+<p>Not a Command: returns the write's own Future.</p>
 </section>
 
 
@@ -111,7 +111,7 @@ behaves like <code>add</code> — resolving only on server ack.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

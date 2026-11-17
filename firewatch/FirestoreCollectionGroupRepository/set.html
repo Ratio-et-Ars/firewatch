@@ -71,7 +71,8 @@ merging with existing data if present.</p>
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final set = Command.createAsyncNoResult&lt;({String path, T model})&gt;(
+  <pre class="language-dart"><code class="language-dart">late final Command&lt;({String path, T model}), void&gt; set =
+    WriteCommand.noResult&lt;({String path, T model})&gt;(
   (r) {
     guardAuth();
     return _ackVoid(
@@ -107,7 +108,7 @@ merging with existing data if present.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

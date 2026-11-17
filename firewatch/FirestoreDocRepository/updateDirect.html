@@ -63,9 +63,9 @@
     </section>
     
 <section class="desc markdown">
-  <p>Fully updates the document with the full model, without the Command
-single-execution guard.</p>
-<p>Unlike <a href="../../firewatch/FirestoreDocRepository/update.html">update</a>, multiple calls can overlap safely.
+  <p>Fully updates the document with the full model, as a plain Future,
+outside the Command.</p>
+<p>Like <a href="../../firewatch/FirestoreDocRepository/update.html">update</a>, multiple calls can overlap safely.
 Fails if the document does not exist.</p>
 </section>
 
@@ -102,7 +102,7 @@ Fails if the document does not exist.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

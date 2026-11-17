@@ -69,7 +69,9 @@
 single-item CRUD operations</li>
 <li>Batch methods (<code>batchAdd</code>, <code>batchSet</code>, <code>batchPatch</code>, <code>batchUpdate</code>,
 <code>batchDelete</code>) for multi-document writes via <code>WriteBatch</code> (atomic per
-500-op chunk; longer lists commit as multiple sequential batches)</li>
+500-op chunk; longer lists commit as multiple batches)</li>
+<li>Write Commands never drop a call: each call is sent to Firestore at once,
+even while earlier writes wait for the server ack (e.g. offline)</li>
 <li><code>WriteAckPolicy</code> for offline-safe writes: cap how long writes await the
 server ack, resolving optimistically once queued locally, and <code>create()</code>
 for locally-minted document IDs that resolve offline</li>
@@ -294,7 +296,7 @@ acknowledgement</strong> before resolving optimistically.
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

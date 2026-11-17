@@ -63,9 +63,10 @@
     </section>
     
 <section class="desc markdown">
-  <p>Partially updates fields without the Command single-execution guard.</p>
-<p>Unlike <a href="../../firewatch/FirestoreCollectionRepository/patch.html">patch</a>, multiple calls can overlap safely — use this when
-rapidly editing different documents in the same collection.</p>
+  <p>Partially updates fields as a plain Future, outside the Command.</p>
+<p>Like <a href="../../firewatch/FirestoreCollectionRepository/patch.html">patch</a>, multiple calls can overlap safely. Use this when you
+want the write's own Future (its ack, or its error) instead of the
+Command's shared state.</p>
 </section>
 
 
@@ -101,7 +102,7 @@ rapidly editing different documents in the same collection.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

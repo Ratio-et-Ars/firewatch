@@ -71,7 +71,7 @@ Example: <code>delete(model.id);</code></p>
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final delete = Command.createAsyncNoResult&lt;String&gt;(
+  <pre class="language-dart"><code class="language-dart">late final Command&lt;String, void&gt; delete = WriteCommand.noResult&lt;String&gt;(
   (String docId) =&gt;
       _ackVoid(_colOrThrow().doc(docId).delete()),
 );</code></pre>
@@ -103,7 +103,7 @@ Example: <code>delete(model.id);</code></p>
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

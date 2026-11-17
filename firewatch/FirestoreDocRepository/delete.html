@@ -69,7 +69,7 @@
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final delete = Command.createAsyncNoParamNoResult(
+  <pre class="language-dart"><code class="language-dart">late final Command&lt;void, void&gt; delete = WriteCommand.noParamNoResult(
   () =&gt; _ackVoid(_docOrThrow().delete()),
 );</code></pre>
 </section>
@@ -100,7 +100,7 @@
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

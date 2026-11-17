@@ -68,7 +68,7 @@ documents are merged via <code>SetOptions(merge: true)</code>, matching the
 behaviour of the single-item <a href="../../firewatch/FirestoreCollectionRepository/set.html">set</a> command.</p>
 <p>This is a <a href="https://pub.dev/documentation/command_it/9.5.2/command_it/Command-class.html">Command</a>, so it exposes <code>isRunning</code>, <code>errors</code>, and can be
 awaited via <code>runAsync</code>. Lists exceeding <a href="../../firewatch/FirestoreCollectionRepository/batchLimit-constant.html">batchLimit</a> (500) are
-automatically split into sequential batches.</p>
+automatically split into batches of 500.</p>
 <p>Example:</p>
 <pre class="language-dart"><code class="language-dart">await repo.batchSet.runAsync([user1, user2]);
 </code></pre>
@@ -77,7 +77,8 @@ automatically split into sequential batches.</p>
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final batchSet = Command.createAsyncNoResult&lt;List&lt;T&gt;&gt;(
+  <pre class="language-dart"><code class="language-dart">late final Command&lt;List&lt;T&gt;, void&gt; batchSet =
+    WriteCommand.noResult&lt;List&lt;T&gt;&gt;(
   (models) =&gt; _runBatched(
     models,
     (batch, col, model) =&gt;
@@ -112,7 +113,7 @@ automatically split into sequential batches.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

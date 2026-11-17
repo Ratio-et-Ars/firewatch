@@ -75,10 +75,11 @@ the ID directly without the Command wrapper.</p>
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final add = Command.createAsync&lt;Map&lt;String, dynamic&gt;, String?&gt;(
-  (Map&lt;String, dynamic&gt; data) =&gt; create(data),
-  initialValue: null,
-);</code></pre>
+  <pre class="language-dart"><code class="language-dart">late final Command&lt;Map&lt;String, dynamic&gt;, String?&gt; add =
+    WriteCommand.withResult&lt;Map&lt;String, dynamic&gt;, String?&gt;(
+      (Map&lt;String, dynamic&gt; data) =&gt; create(data),
+      initialValue: null,
+    );</code></pre>
 </section>
 
 
@@ -107,7 +108,7 @@ the ID directly without the Command wrapper.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

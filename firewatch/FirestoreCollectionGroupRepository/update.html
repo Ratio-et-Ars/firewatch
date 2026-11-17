@@ -70,7 +70,8 @@ Behavior: Calls <code>.update()</code> with the entire serialized model.</p>
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final update = Command.createAsyncNoResult&lt;({String path, T model})&gt;(
+  <pre class="language-dart"><code class="language-dart">late final Command&lt;({String path, T model}), void&gt; update =
+    WriteCommand.noResult&lt;({String path, T model})&gt;(
   (r) {
     guardAuth();
     return _ackVoid(fs.doc(r.path).update(r.model.toJson()));
@@ -104,7 +105,7 @@ Behavior: Calls <code>.update()</code> with the entire serialized model.</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

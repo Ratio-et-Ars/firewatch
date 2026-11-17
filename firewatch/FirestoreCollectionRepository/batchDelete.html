@@ -65,7 +65,7 @@
   <p>Deletes multiple documents from the collection in a single batched write.</p>
 <p>This is a <a href="https://pub.dev/documentation/command_it/9.5.2/command_it/Command-class.html">Command</a>, so it exposes <code>isRunning</code>, <code>errors</code>, and can be
 awaited via <code>runAsync</code>. Lists exceeding <a href="../../firewatch/FirestoreCollectionRepository/batchLimit-constant.html">batchLimit</a> (500) are
-automatically split into sequential batches.</p>
+automatically split into batches of 500.</p>
 <p>Example:</p>
 <pre class="language-dart"><code class="language-dart">repo.batchDelete.run(['id1', 'id2', 'id3']);
 // or await:
@@ -76,7 +76,8 @@ await repo.batchDelete.runAsync(['id1', 'id2', 'id3']);
       
 <section class="summary source-code" id="source">
   <h2><span>Implementation</span></h2>
-  <pre class="language-dart"><code class="language-dart">late final batchDelete = Command.createAsyncNoResult&lt;List&lt;String&gt;&gt;(
+  <pre class="language-dart"><code class="language-dart">late final Command&lt;List&lt;String&gt;, void&gt; batchDelete =
+    WriteCommand.noResult&lt;List&lt;String&gt;&gt;(
   (docIds) =&gt; _runBatched(docIds, (batch, col, id) =&gt; batch.delete(col.doc(id))),
 );</code></pre>
 </section>
@@ -107,7 +108,7 @@ await repo.batchDelete.runAsync(['id1', 'id2', 'id3']);
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

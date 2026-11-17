@@ -202,12 +202,35 @@ allFriendsRepo.set((path: 'users/abc123/friends/f1', model: friend));
 allFriendsRepo.patch((path: 'users/abc123/friends/f1', data: {'name': 'Bob'}));
 allFriendsRepo.delete('users/abc123/friends/f1');
 </code></pre>
-<h3 id="direct-writes-concurrent-safe">Direct writes (concurrent-safe)</h3>
-<p>Commands are single-execution — a second call while the first is in-flight is
-silently dropped. When you need to rapidly write to <strong>different documents</strong> in
-the same collection (e.g. toggling checkboxes), use the <code>*Direct</code> methods:</p>
-<pre class="language-dart"><code class="language-dart">// These return Futures and can overlap safely:
-await friendsRepo.patchDirect((id: 'f1', data: {'checked': true}));
+<h3 id="rapid-and-offline-writes">Rapid and offline writes</h3>
+<p>Firestore applies a write to the local cache at once, but the write's future
+completes only when the <strong>server</strong> acknowledges it — offline, not until
+connectivity returns. Write Commands never drop a call while an earlier write
+waits for its ack: every call is sent to Firestore immediately, in call order,
+so it shows up in local reads and listeners right away and writes to the same
+document keep their order.</p>
+<pre class="language-dart"><code class="language-dart">// Offline: all three land in the local cache and sync later.
+groceriesRepo.set(milk);
+groceriesRepo.set(eggs);
+groceriesRepo.set(bread);
+</code></pre>
+<p>Each call still gets its own Command execution, one at a time in call order,
+and each waits for its own ack:</p>
+<ul>
+<li><code>isRunning</code> is <code>true</code> while any write is unacknowledged (offline, that can
+be for a long time; pass a <code>writeAckPolicy</code> with an <code>ackGrace</code> to bound
+it). It may report <code>false</code> for one microtask between two queued writes.</li>
+<li><code>runAsync(x)</code> completes with <strong>x's own</strong> outcome (for <code>add</code>, its own ID).</li>
+<li>A failed write reports its own error through the Command's error filter
+(<code>errors</code>, <code>results</code>, <code>Command.globalExceptionHandler</code>), as before.</li>
+</ul>
+<blockquote>
+<p>Before 1.14.2, a Command ignored calls while its previous write was in
+flight, so offline every write after the first was silently dropped.</p>
+</blockquote>
+<p>The <code>*Direct</code> methods return the write's own <code>Future</code> instead of going through
+a Command:</p>
+<pre class="language-dart"><code class="language-dart">await friendsRepo.patchDirect((id: 'f1', data: {'checked': true}));
 await friendsRepo.patchDirect((id: 'f2', data: {'checked': false}));
 
 // Also available: addDirect, setDirect, updateDirect, deleteDirect
@@ -218,10 +241,10 @@ await friendsRepo.patchDirect((id: 'f2', data: {'checked': false}));
 <blockquote>
 <p><strong>Atomicity is per chunk, not per call.</strong> A single <code>WriteBatch</code> is limited to
 500 operations, so a list longer than 500 is committed as <strong>multiple
-sequential batches</strong>. Each batch is atomic on its own, but if a later chunk
-fails, earlier chunks are already committed — the call is <strong>not</strong> all-or-
-nothing across the 500-op boundary. Keep batches ≤ 500 items if you need true
-atomicity.</p>
+batches</strong>, all sent at once in order. Each batch is atomic on its own, but a
+failing chunk does not undo or stop the others — the call is <strong>not</strong>
+all-or-nothing across the 500-op boundary. Keep batches ≤ 500 items if you
+need true atomicity.</p>
 </blockquote>
 <h2 id="caching--freshness">Caching &amp; freshness</h2>
 <p>Repositories are <strong>cache-first</strong>: they prime <code>value</code> from the local Firestore
@@ -329,7 +352,7 @@ fetch errors:</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>

@@ -418,7 +418,7 @@ not matter (the epoch guard discards any late events).
 
 </dt>
 <dd>
-  Deletes the document without the Command guard.
+  Deletes the document as a plain Future, outside the Command.
   
 
 </dd>
@@ -493,7 +493,7 @@ is possible to uninstall the <code>handler</code> from the <code>handler</code> 
 
 </dt>
 <dd>
-  Partially updates specific fields without the Command guard.
+  Partially updates specific fields as a plain Future, outside the Command.
   
 
 </dd>
@@ -533,7 +533,7 @@ notified when the object changes.
 
 </dt>
 <dd>
-  Partially sets specific fields without the Command guard, creating
+  Partially sets specific fields as a plain Future, outside the Command, creating
 the doc if missing.
   
 
@@ -560,8 +560,8 @@ the doc if missing.
 
 </dt>
 <dd>
-  Fully updates the document with the full model, without the Command
-single-execution guard.
+  Fully updates the document with the full model, as a plain Future,
+outside the Command.
   
 
 </dd>
@@ -574,8 +574,8 @@ single-execution guard.
 
 </dt>
 <dd>
-  Creates or merges the document with the full model, without the
-Command single-execution guard.
+  Creates or merges the document with the full model, as a plain Future,
+outside the Command.
   
 
 </dd>
@@ -630,7 +630,7 @@ Command single-execution guard.
 <footer>
   <span class="no-break">
     firewatch
-      1.14.1
+      1.14.2
   </span>
   
 </footer>
