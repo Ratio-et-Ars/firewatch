@@ -13,12 +13,22 @@ concurrency:
 
 jobs:
   test:
+    name: test (cloud_firestore ${{ matrix.cloud_firestore }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both FlutterFire majors the package supports. Each leg pins the
+        # resolution to one major so a regression on either shows up here.
+        cloud_firestore: ["^6.0.0", "^7.0.0"]
     steps:
       - uses: actions/checkout@v4
 
       - uses: subosito/flutter-action@v2
         with: { channel: stable, flutter-version: 3.47.2 }
+
+      - name: Pin cloud_firestore ${{ matrix.cloud_firestore }}
+        run: flutter pub add "cloud_firestore:${{ matrix.cloud_firestore }}"
 
       - run: flutter pub get
 

@@ -15,6 +15,10 @@ dependencies:
   firewatch:
 ```
 
+Firewatch works with both FlutterFire majors: `cloud_firestore` 6.x
+(`firebase_core` 4) and 7.x (`firebase_core` 5). Your app's own Firebase
+packages pick the major; CI tests both.
+
 ## Quick start
 
 Firewatch repositories are built to work seamlessly with [`watch_it`](https://pub.dev/packages/watch_it).

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.15.0
+
+### Changed
+- **Supports `cloud_firestore` 7.x** (the FlutterFire major built on
+  `firebase_core` 5) as well as 6.x: the constraint is now
+  `">=6.0.0 <8.0.0"`. No code changes: the breaking changes in
+  `cloud_firestore` 7 are native SDK bumps (Firebase iOS SDK 13, Android BoM
+  35 with `minSdk` 24) and leave the Dart API firewatch uses unchanged. The
+  1.14.1 web write re-wrap still applies: `cloud_firestore_web` 5.9 still
+  returns raw `JSPromise.toDart` futures from `delete()` and `commit()`.
+- Dev: `fake_cloud_firestore` `^4.4.0` (was `^4.0.0`), the first release
+  that resolves against both majors. CI runs analyze and the tests once per
+  major.
+
 ## 1.14.2
 
 ### Fixed
