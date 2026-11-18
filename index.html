@@ -56,6 +56,9 @@
 <pre class="language-yaml"><code class="language-yaml">dependencies:
   firewatch:
 </code></pre>
+<p>Firewatch works with both FlutterFire majors: <code>cloud_firestore</code> 6.x
+(<code>firebase_core</code> 4) and 7.x (<code>firebase_core</code> 5). Your app's own Firebase
+packages pick the major; CI tests both.</p>
 <h2 id="quick-start">Quick start</h2>
 <p>Firewatch repositories are built to work seamlessly with <a href="https://pub.dev/packages/watch_it"><code>watch_it</code></a>.
 Here’s the minimal flow: <strong>Model → Repository → UI</strong>.</p>
@@ -352,7 +355,7 @@ fetch errors:</p>
 <footer>
   <span class="no-break">
     firewatch
-      1.14.2
+      1.15.0
   </span>
   
 </footer>
